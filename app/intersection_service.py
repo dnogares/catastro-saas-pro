@@ -1,64 +1,95 @@
 import os
-import pandas as pd
 import json
+import csv
 from pathlib import Path
 from typing import Dict, List, Optional
+from datetime import datetime
 import logging
 import geopandas as gpd
-from shapely.geometry import shape
-
+from shapely.ops import unary_union
+from shapely.geometry import Point
 logger = logging.getLogger(__name__)
-
 class IntersectionService:
-    def __init__(self, data_dir: str = "/app/capas"):
-        # Ruta donde Easypanel monta tu volumen
+    def __init__(self, data_dir: str = "/app/app/capas"):
         self.data_dir = Path(data_dir)
-        self.wms_config_path = self.data_dir / "wms" / "capas_wms.csv"
-        logger.info(f"[IntersectionService] Iniciado con volumen en: {data_dir}")
-
-    def listar_capas_configuradas(self) -> List[Dict]:
-        """Lee el archivo capas_wms.csv que creaste por consola"""
-        if not self.wms_config_path.exists():
-            logger.error(f"Archivo de configuraciÃ³n no encontrado: {self.wms_config_path}")
-            return []
-        df = pd.read_csv(self.wms_config_path)
-        return df.to_dict(orient='records')
-
-    def obtener_leyenda_local(self, nombre_capa: str) -> List[Dict]:
-        """Carga los colores y etiquetas desde tus archivos leyenda_xxx.csv"""
-        archivo = self.data_dir / "wms" / f"leyenda_{nombre_capa.lower()}.csv"
-        if archivo.exists():
-            return pd.read_csv(archivo).to_dict(orient='records')
-        return []
-
-    def analizar_intersecciones(self, geometria_parcela_gdf: gpd.GeoDataFrame) -> List[Dict]:
-        """Cruza la parcela con los GPKG locales del volumen"""
-        resultados = []
-        capas = self.listar_capas_configuradas()
-
-        for capa in capas:
-            gpkg_path = self.data_dir / "gpkg" / capa['gpkg']
+        self.capas_cache = {}
+        self._verificar_estructura()
+        logger.info(f"[IntersectionService] Inicializado: {data_dir}")
+    def _verificar_estructura(self):
+        for subdir in ["gpkg", "shapefiles", "wms"]:
+            path = self.data_dir / subdir
+            if not path.exists():
+                path.mkdir(parents=True, exist_ok=True)
+    def cargar_capa(self, nombre_capa: str) -> Optional[gpd.GeoDataFrame]:
+        if nombre_capa in self.capas_cache:
+            return self.capas_cache[nombre_capa]
+        for fmt in [".gpkg", ".shp"]:
+            gpkg_path = self.data_dir / "gpkg" / f"{nombre_capa}{fmt}"
             if gpkg_path.exists():
                 try:
-                    # Cargar capa del volumen
-                    gdf_capa = gpd.read_file(gpkg_path)
-                    
-                    # Asegurar que el sistema de coordenadas coincida (EPSG:4326)
-                    if gdf_capa.crs != geometria_parcela_gdf.crs:
-                        gdf_capa = gdf_capa.to_crs(geometria_parcela_gdf.crs)
-                    
-                    # IntersecciÃ³n espacial
-                    interseccion = gpd.sjoin(geometria_parcela_gdf, gdf_capa, how="inner", predicate="intersects")
-                    
-                    if not interseccion.empty:
-                        leyenda = self.obtener_leyenda_local(capa['nombre'])
-                        resultados.append({
-                            "capa": capa['nombre'],
-                            "afectado": True,
-                            "info_adicional": interseccion.drop(columns='geometry').to_dict(orient='records'),
-                            "leyenda": leyenda
-                        })
+                    gdf = gpd.read_file(str(gpkg_path))
+                    self.capas_cache[nombre_capa] = gdf
+                    return gdf
                 except Exception as e:
-                    logger.error(f"Error analizando capa {capa['nombre']}: {e}")
-        
-        return resultados
+                    logger.error(f"[IntersectionService] Error: {e}")
+        return None
+    def listar_capas(self) -> List[Dict]:
+        capas = []
+        gpkg_dir = self.data_dir / "gpkg"
+        if gpkg_dir.exists():
+            for f in gpkg_dir.glob("*.gpkg"):
+                try:
+                    gdf = gpd.read_file(str(f))
+                    capas.append({"nombre": f.stem, "tipo": "gpkg", "archivo": f.name, "elementos": len(gdf)})
+                except Exception as e:
+                    capas.append({"nombre": f.stem, "tipo": "gpkg", "error": str(e)})
+        wms_csv = self.data_dir / "wms" / "capas_wms.csv"
+        if wms_csv.exists():
+            with open(wms_csv, 'r', encoding='utf-8') as f:
+                for row in csv.DictReader(f):
+                    if row.get("nombre"):
+                        capas.append({"nombre": row["nombre"], "tipo": "wms", "url": row.get("ruta_wms", "")})
+        return capas
+    def analyze_file(self, file_path: str, output_dir: str = None) -> Dict:
+        logger.info(f"[IntersectionService] Analizando: {file_path}")
+        try:
+            entrada_gdf = gpd.read_file(file_path)
+            if entrada_gdf.crs is None:
+                entrada_gdf = entrada_gdf.set_crs("EPSG:4326")
+            entrada_gdf = entrada_gdf.to_crs("EPSG:4326")
+            resultado = {"archivo_entrada": file_path, "timestamp": datetime.now().isoformat(), "elementos_entrada": len(entrada_gdf), "capas_analizadas": [], "intersecciones": []}
+            geometria_union = unary_union(entrada_gdf.geometry.tolist())
+            capas = self.listar_capas()
+            resultado["capas_analizadas"] = [c["nombre"] for c in capas]
+            for capa in capas:
+                if capa.get("tipo") in ["gpkg", "shapefile"]:
+                    capa_gdf = self.cargar_capa(capa["nombre"])
+                    if capa_gdf is not None and not capa_gdf.empty:
+                        try:
+                            capa_crs = capa_gdf.to_crs("EPSG:4326")
+                            joined = gpd.sjoin(entrada_gdf, capa_crs, how='inner', predicate='intersects')
+                            resultado["intersecciones"].append({"capa": capa["nombre"], "elementos_encontrados": len(joined)})
+                        except Exception as e:
+                            resultado["intersecciones"].append({"capa": capa["nombre"], "error": str(e)})
+            if output_dir:
+                output_path = Path(output_dir) / "intersecciones.json"
+                with open(output_path, 'w', encoding='utf-8') as f:
+                    json.dump(resultado, f, indent=2)
+            return resultado
+        except Exception as e:
+            return {"error": str(e), "archivo_entrada": file_path}
+    def verificar_punto(self, lon: float, lat: float) -> Dict:
+        punto = Point(lon, lat)
+        punto_gdf = gpd.GeoDataFrame(geometry=[punto], crs="EPSG:4326")
+        resultado = {"punto": {"lon": lon, "lat": lat}, "capas_afectadas": []}
+        for capa in self.listar_capas():
+            if capa.get("tipo") in ["gpkg", "shapefile"]:
+                capa_gdf = self.cargar_capa(capa["nombre"])
+                if capa_gdf is not None:
+                    try:
+                        intersectado = gpd.sjoin(punto_gdf, capa_gdf, how='inner', predicate='within')
+                        if len(intersectado) > 0:
+                            resultado["capas_afectadas"].append({"capa": capa["nombre"], "elementos": len(intersectado)})
+                    except Exception:
+                        pass
+        return resultado
