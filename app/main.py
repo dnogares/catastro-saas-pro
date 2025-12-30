@@ -1,10 +1,10 @@
 import os
 from pathlib import Path
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-# --- IMPORTACIONES DE TUS ARCHIVOS ---
+# --- IMPORTACIONES CORREGIDAS ---
 from app.config import settings
 from app.schemas import QueryRequest, CatastroResponse
 from app.catastro_engine import CatastroDownloader, GeneradorInformeCatastral
@@ -18,7 +18,7 @@ app = FastAPI(
     debug=settings.DEBUG
 )
 
-# Configuración de CORS para que tu Frontend pueda conectar
+# Configuración de CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -26,58 +26,61 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Montar carpeta de descargas para que los archivos sean accesibles por URL
+# Asegurar que existan los directorios base
+Path(settings.OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
+
+# Montar carpeta de descargas (para acceder a PDFs y Mapas vía URL)
 app.mount("/outputs", StaticFiles(directory=settings.OUTPUT_DIR), name="outputs")
 
-# Inicializar servicios globales (Singleton para aprovechar la caché de capas)
+# Inicializar Servicio GIS (Carga las capas GPKG en memoria una sola vez)
 intersection_service = IntersectionService(data_dir=settings.CAPAS_DIR)
 
 @app.post("/api/analizar", response_model=CatastroResponse)
-async def endpoint_analisis_completo(request: QueryRequest):
+async def analizar_completo(request: QueryRequest):
     ref = request.referencia_catastral.upper().strip()
     
-    # Crear subcarpeta específica para esta consulta
+    # Carpeta específica para los resultados de esta parcela
     path_salida_ref = Path(settings.OUTPUT_DIR) / ref
     path_salida_ref.mkdir(parents=True, exist_ok=True)
 
     try:
-        # 1. MOTOR CATASTRAL: Descarga de Geometría y Datos
+        # 1. MOTOR CATASTRAL: Bajar GeoJSON y Datos oficiales
         downloader = CatastroDownloader(output_dir=str(path_salida_ref))
-        res_catastro = downloader.descargar_todo(ref, crear_zip=False)
+        res_catastro = downloader.descargar_todo(ref, crear_zip=True)
         
         path_geojson = res_catastro.get("geojson_path")
-        if not path_geojson:
-            raise HTTPException(status_code=404, detail="No se encontró la referencia en Catastro")
+        if not path_geojson or not Path(path_geojson).exists():
+            raise HTTPException(status_code=404, detail="No se pudo obtener la geometría de Catastro")
 
-        # 2. MOTOR DE INTERSECCIONES: Cruce con tus 4.8GB de GPKG
-        # Analiza inundabilidad, protecciones, etc.
+        # 2. MOTOR GIS: Cruce con capas de inundabilidad/medio ambiente
+        # Usa el servicio global para no recargar los 4.8GB cada vez
         res_gis = intersection_service.analyze_file(path_geojson, output_dir=str(path_salida_ref))
 
-        # 3. MOTOR URBANÍSTICO: Cálculo de superficies y zonas
-        # Le pasamos el servicio de intersecciones para que use las mismas capas
+        # 3. MOTOR URBANÍSTICO: Superficies y Afecciones Locales
         analizador_urb = AnalizadorUrbanistico(capas_service=intersection_service)
         res_urbanismo = analizador_urb.analizar_referencia(ref, geometria_path=path_geojson)
 
-        # 4. MOTOR AVANZADO: Generación de Mapa HTML Interactivo (Leaflet)
+        # 4. MOTOR VISUAL: Generar el Mapa Web Interactivo (Leaflet)
+        # Nota: AdvancedAnalysisModule procesa el geojson y crea el .html
         adv_module = AdvancedAnalysisModule(output_dir=str(settings.OUTPUT_DIR))
         res_visual = adv_module.procesar_archivos([path_geojson])
 
-        # 5. GENERACIÓN DE INFORME PDF FINAL
+        # 5. GENERACIÓN DEL INFORME PDF PROFESIONAL
         path_pdf = path_salida_ref / f"Informe_{ref}.pdf"
         generador_pdf = GeneradorInformeCatastral(ref, str(path_salida_ref))
         generador_pdf.generar_pdf(str(path_pdf))
 
-        # Construir respuesta consolidada
+        # Construir respuesta para el Frontend
         return CatastroResponse(
             status="success",
             data={
                 "referencia": ref,
-                "superficie": res_urbanismo.get("superficie"),
-                "afecciones_detectadas": res_gis.get("intersecciones"),
-                "urls": {
+                "superficie_m2": res_urbanismo.get("superficie", {}).get("valor"),
+                "afecciones": res_gis.get("intersecciones", []),
+                "descargas": {
                     "pdf": f"/outputs/{ref}/Informe_{ref}.pdf",
                     "mapa_interactivo": f"/outputs/{ref}/{ref}_mapa.html",
-                    "geojson": f"/outputs/{ref}/{ref}.geojson"
+                    "zip_completo": f"/outputs/{ref}_datos.zip"
                 }
             }
         )
@@ -89,5 +92,5 @@ async def endpoint_analisis_completo(request: QueryRequest):
         )
 
 @app.get("/api/health")
-async def health_check():
-    return {"status": "online", "capas_dir": settings.CAPAS_DIR}
+async def health():
+    return {"status": "ok", "env": settings.ENV}
