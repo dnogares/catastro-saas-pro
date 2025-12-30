@@ -1,90 +1,71 @@
 import os
-import io
-import shutil
 from pathlib import Path
-from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from fastapi.responses import JSONResponse
-import uvicorn
 
-# --- IMPORTACIONES DE TUS MÓDULOS ---
-from app.catastro_engine import CatastroDownloader, procesar_y_comprimir
+# --- IMPORTACIONES SEGÚN TUS ARCHIVOS SUBIDOS ---
+from app.catastro_engine import CatastroDownloader
 from app.intersection_service import IntersectionService
 from app.urban_analysis import AnalizadorUrbanistico
-from app.advanced_analysis import AnalizadorAfeccionesAmbientales
+from app.new_analysis_module import AdvancedAnalysisModule
 from app.schemas import QueryRequest
 
-# --- CONFIGURACIÓN ---
-BASE_PATH = Path(os.path.dirname(os.path.abspath(__file__)))
-OUTPUT_ROOT = Path("descargas_sistema")
+app = FastAPI()
+
+# Directorios de trabajo
+BASE_PATH = Path("/app/app")
+OUTPUT_ROOT = Path("/app/app/outputs")
 OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="Catastro SaaS Pro API")
-
-# Montar estáticos y plantillas
-app.mount("/static", StaticFiles(directory=str(BASE_PATH / "static")), name="static")
+# Servir archivos para que el frontend pueda descargarlos
 app.mount("/outputs", StaticFiles(directory=str(OUTPUT_ROOT)), name="outputs")
-templates = Jinja2Templates(directory=str(BASE_PATH / "templates"))
-
-# Inicializar servicios
-intersector = IntersectionService(data_dir=str(BASE_PATH / "capas"))
-
-# --- EL ORQUESTADOR (LO QUE PIDIÓ EL USUARIO) ---
-def flujo_total_analisis(ref: str):
-    ref = ref.strip().upper()
-    dir_ref = OUTPUT_ROOT / ref
-    dir_ref.mkdir(parents=True, exist_ok=True)
-
-    # 1. CATASTRO ENGINE: Descarga base y GeoJSON/KML
-    # Usamos procesar_y_comprimir que ya tienes en catastro_engine.py
-    zip_inicial, data_catastro = procesar_y_comprimir(ref, str(OUTPUT_ROOT))
-    
-    path_geojson = dir_ref / f"{ref}.geojson"
-    path_kml = dir_ref / f"{ref}.kml"
-
-    # 2. INTERSECTION SERVICE: Análisis de GPKG locales (Capas pesadas)
-    if intersector and path_geojson.exists():
-        intersector.analyze_file(str(path_geojson), output_dir=str(dir_ref))
-
-    # 3. URBAN ANALYSIS: Conexión WMS/WFS (Urbanismo de la Región)
-    if path_geojson.exists():
-        urb = AnalizadorUrbanistico(str(path_geojson), str(dir_ref))
-        urb.ejecutar_analisis_completo()
-
-    # 4. ADVANCED ANALYSIS: Afecciones Ambientales (Shapefiles)
-    if path_kml.exists():
-        amb = AnalizadorAfeccionesAmbientales(str(path_kml), data_dir=str(BASE_PATH / "capas"))
-        amb.ejecutar_analisis()
-        amb.generar_pdf(str(dir_ref / f"Informe_Ambiental_{ref}.pdf"))
-
-    # 5. RE-COMPRESIÓN FINAL: Incluir todos los nuevos mapas y PDFs en el ZIP
-    zip_final, _ = procesar_y_comprimir(ref, str(OUTPUT_ROOT))
-    
-    return {
-        "referencia": ref,
-        "zip_url": f"/outputs/{Path(zip_final).name}",
-        "pdf_ambiental": f"/outputs/{ref}/Informe_Ambiental_{ref}.pdf",
-        "geojson": f"/outputs/{ref}/{ref}.geojson"
-    }
-
-# --- ENDPOINTS ---
-@app.get("/")
-async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
-@app.get("/dashboard")
-async def dashboard(request: Request):
-    return templates.TemplateResponse("dashboard.html", {"request": request})
 
 @app.post("/api/catastro/analisis-completo")
 async def api_analisis_completo(request: QueryRequest):
+    ref = request.referencia_catastral.strip().upper()
+    
     try:
-        # Ejecutamos toda la lógica de tus archivos .py
-        resultado = flujo_total_analisis(request.referencia_catastral)
-        return {"status": "success", "data": resultado}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "detail": str(e)})
+        # 1. CATASTRO: Obtener datos y geometría
+        # Según tu catastro_engine.py, la clase se inicializa con output_dir
+        catastro = CatastroDownloader(output_dir=str(OUTPUT_ROOT))
+        datos_catastro = catastro.consultar_referencia(ref)
+        
+        # Guardamos el GeoJSON (necesario para los siguientes pasos)
+        # Nota: Asegúrate de que descargar_geometria devuelva la ruta del archivo
+        path_geojson = catastro.descargar_geometria(ref) 
+        
+        if not path_geojson:
+            raise Exception("No se pudo obtener la geometría de Catastro")
 
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+        # 2. INTERSECCIONES: Cruce con GPKG/Capas locales
+        # Según tu intersection_service.py, busca en /app/app/capas
+        service_interseccion = IntersectionService(data_dir=str(BASE_PATH / "capas"))
+        resultados_gis = service_interseccion.analyze_file(path_geojson, output_dir=str(OUTPUT_ROOT / ref))
+
+        # 3. URBANISMO: Análisis WMS/WFS
+        # Tu urban_analysis.py usa analizar_referencia
+        analizador_urb = AnalizadorUrbanistico(normativa_dir=str(BASE_PATH / "normativa"))
+        resultado_urb = analizador_urb.analizar_referencia(ref, geometria_path=path_geojson)
+
+        # 4. ANÁLISIS AVANZADO: KML/GeoJSON Processing
+        # Tu new_analysis_module.py tiene AdvancedAnalysisModule
+        adv_module = AdvancedAnalysisModule(output_dir=str(OUTPUT_ROOT))
+        resultado_adv = adv_module.procesar_archivos([path_geojson])
+
+        return {
+            "status": "success",
+            "referencia": ref,
+            "resultados": {
+                "catastro": datos_catastro,
+                "gis": resultados_gis,
+                "urbanismo": resultado_urb,
+                "avanzado": resultado_adv
+            },
+            "descargas": {
+                "geojson": f"/outputs/{ref}/{ref}.geojson",
+                "pdf_informe": f"/outputs/{ref}/informe_final.pdf" # Si lo generas
+            }
+        }
+
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
