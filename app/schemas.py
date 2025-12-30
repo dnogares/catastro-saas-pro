@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 
 class QueryRequest(BaseModel):
@@ -6,7 +6,7 @@ class QueryRequest(BaseModel):
 
 class CatastroResponse(BaseModel):
     status: str
-    data: Optional[Dict] = None
+    data: Optional[Dict[str, Any]] = None
     detail: Optional[str] = None
 
 class BatchRequest(BaseModel):
