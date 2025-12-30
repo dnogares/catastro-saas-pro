@@ -8,17 +8,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 
-# Importación de tu motor lógico
-try:
-    from app.catastro_engine import CatastroDownloader, procesar_y_comprimir
-except ImportError:
-    # Simulación para evitar errores de arranque si el archivo no está en la ruta
-    def procesar_y_comprimir(ref, directorio_base):
-        return f"{directorio_base}/{ref}_completo.zip", {"lat": 40.41, "lon": -3.70, "superficie": "Pendiente"}
+# Importamos tu motor lógico
+from app.catastro_engine import CatastroDownloader, procesar_y_comprimir
 
-app = FastAPI(title="Catastro GIS Pro - Business Suite")
+app = FastAPI(title="Catastro GIS Pro - Enterprise")
 
-# --- RUTAS DE SISTEMA ---
+# --- CONFIGURACIÓN DE MARCA (Personaliza esto) ---
+CONFIG_EMPRESA = {
+    "nombre": "TU CONSULTORÍA TÉCNICA",
+    "web": "www.tuingenieria.com",
+    "color_primario": "#3b82f6"
+}
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 OUTPUT_DIR = BASE_DIR / "outputs"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -31,190 +32,137 @@ app.mount("/outputs", StaticFiles(directory=str(OUTPUT_DIR)), name="outputs")
 @app.post("/api/analizar")
 async def api_analizar(data: dict):
     ref = data.get("referencia_catastral", "").upper().strip()
-    if not ref: raise HTTPException(status_code=400, detail="Referencia vacía")
+    if not ref: raise HTTPException(status_code=400, detail="Referencia requerida")
     
     try:
+        # El motor procesa la finca y genera los archivos
         zip_path, resultados = procesar_y_comprimir(ref, directorio_base=str(OUTPUT_DIR))
-        ref_clean = ref.replace(" ", "")
         
+        # Calculamos discrepancia si el motor nos da superficie real vs catastral
+        sup_cat = resultados.get('superficie', 0)
+        sup_medida = resultados.get('superficie_grafica', sup_cat) # Simulado si no hay medición externa
+        discrepancia = abs(float(sup_cat) - float(sup_medida)) if sup_cat != 'N/A' else 0
+
         return {
             "status": "success",
+            "empresa": CONFIG_EMPRESA,
             "data": {
                 "referencia": ref,
                 "zip_url": f"/outputs/{os.path.basename(zip_path)}",
-                "pdf_url": f"/outputs/{ref_clean}/{ref_clean}_Informe_Analisis_Espacial.pdf",
+                "pdf_url": f"/outputs/{ref.replace(' ', '')}/{ref.replace(' ', '')}_Informe_Analisis_Espacial.pdf",
                 "coords": {"lat": resultados.get('lat'), "lon": resultados.get('lon')},
-                "stats": resultados
+                "metricas": {
+                    "catastral": f"{sup_cat} m²",
+                    "discrepancia": f"{round(discrepancia, 2)} m²",
+                    "alerta": discrepancia > (float(sup_cat or 0) * 0.05) # Alerta si supera el 5%
+                }
             }
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/upload-vector")
-async def api_upload_vector(files: List[UploadFile] = File(...)):
-    results = []
-    for file in files:
-        content = await file.read()
-        text = content.decode("utf-8", errors="ignore")
-        refs = list(set(re.findall(r'[0-9]{7}[A-Z]{2}[0-9]{4}[A-Z]{1}[0-9]{4}[A-Z]{2}', text)))
-        for r in refs:
-            zip_p, _ = procesar_y_comprimir(r, directorio_base=str(OUTPUT_DIR))
-            results.append({"archivo": file.filename, "ref": r, "zip": f"/outputs/{os.path.basename(zip_p)}"})
-    return {"status": "success", "analisis": results}
-
-# --- INTERFAZ PREMIUM ---
+# --- DASHBOARD DE ALTO IMPACTO ---
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard():
-    return """
+    return f"""
     <!DOCTYPE html>
     <html lang="es">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>GIS Catastro Pro | Engineering Suite</title>
+        <title>GIS Enterprise | {CONFIG_EMPRESA['nombre']}</title>
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <script src="https://cdn.tailwindcss.com"></script>
         <style>
-            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-            body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
-            #map { height: 100%; width: 100%; border-left: 1px solid #334155; }
-            .sidebar { background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(12px); border-right: 1px solid #334155; }
-            .glass-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; transition: all 0.3s; }
-            .glass-card:hover { border-color: #3b82f6; background: rgba(59, 130, 246, 0.05); }
-            ::-webkit-scrollbar { width: 6px; }
-            ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+            .sidebar-blur {{ background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(10px); }}
+            .card-gradient {{ background: linear-gradient(135deg, rgba(59,130,246,0.1) 0%, rgba(15,23,42,1) 100%); }}
         </style>
     </head>
-    <body class="flex overflow-hidden">
+    <body class="flex h-screen bg-slate-950 text-slate-200 overflow-hidden">
         
-        <div class="sidebar w-[450px] flex flex-col h-screen z-50">
-            <div class="p-6 border-b border-slate-700">
-                <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
-                    CAT PRO GIS
-                </h1>
-                <p class="text-xs text-slate-400 uppercase tracking-widest mt-1 font-semibold">Engineering Suite v3.2</p>
+        <aside class="sidebar-blur w-[450px] border-r border-slate-800 flex flex-col z-50">
+            <div class="p-8 border-b border-slate-800">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-xl">G</div>
+                    <div>
+                        <h1 class="font-bold text-lg tracking-tight uppercase">{CONFIG_EMPRESA['nombre']}</h1>
+                        <p class="text-[10px] text-blue-400 font-mono tracking-widest uppercase">Sistema de Inteligencia Territorial</p>
+                    </div>
+                </div>
             </div>
 
-            <div class="flex-grow overflow-y-auto p-6 space-y-6">
-                
-                <div class="space-y-3">
-                    <label class="text-sm font-medium text-slate-300">Referencia Catastral</label>
-                    <div class="relative">
-                        <input type="text" id="refInput" placeholder="Ej: 2289738XH6028N0001RY" 
-                               class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all">
-                    </div>
-                    <button onclick="buscarFinca()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg shadow-lg shadow-blue-900/20 transition-all flex items-center justify-center gap-2">
-                        <span>🚀 Analizar Parcela</span>
+            <div class="flex-grow overflow-y-auto p-8 space-y-8">
+                <div class="space-y-4">
+                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-tighter">Nueva Consulta de Activos</h3>
+                    <input type="text" id="refInput" placeholder="Referencia Catastral..." 
+                           class="w-full bg-slate-900/50 border border-slate-700 rounded-xl p-4 text-white focus:border-blue-500 outline-none transition-all shadow-inner">
+                    <button onclick="ejecutarAnalisis()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-all active:scale-95 shadow-lg shadow-blue-900/20">
+                        EJECUTAR ANÁLISIS COMPLETO
                     </button>
                 </div>
 
-                <div class="glass-card p-4">
-                    <h3 class="text-sm font-bold text-slate-200 mb-2">📥 Análisis Espacial Externo</h3>
-                    <input type="file" id="fileInput" class="text-xs text-slate-400 mb-2 block w-full" multiple>
-                    <button onclick="subirKML()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-sm py-2 rounded-md font-semibold transition-all">
-                        Cargar KML / GeoJSON
-                    </button>
+                <div id="resultsFeed" class="space-y-4">
+                    <p class="text-xs text-slate-600 text-center italic">Esperando entrada de datos...</p>
                 </div>
-
-                <div id="loading" class="hidden text-center p-4">
-                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
-                    <p class="mt-2 text-sm text-blue-400">Consultando Sede Electrónica...</p>
-                </div>
-
-                <div id="log-list" class="space-y-4">
-                    </div>
             </div>
 
-            <div class="p-4 border-t border-slate-700 bg-slate-900/50">
-                <p class="text-[10px] text-slate-500 text-center">Datos oficiales: Sede Electrónica del Catastro & IGN España</p>
+            <div class="p-4 bg-slate-900/80 border-t border-slate-800 flex justify-between items-center">
+                <span class="text-[10px] text-slate-500">v3.5 Stable Release</span>
+                <span class="text-[10px] text-blue-500 font-bold">{CONFIG_EMPRESA['web']}</span>
             </div>
-        </div>
+        </aside>
 
-        <div id="map"></div>
+        <main id="map" class="flex-grow"></main>
 
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <script>
-            // Mapa Base con estilo oscuro
-            const map = L.map('map', { zoomControl: false }).setView([40.41, -3.70], 6);
-            L.control.zoom({ position: 'bottomright' }).addTo(map);
+            const map = L.map('map', {{ zoomControl: false }}).setView([40.41, -3.70], 6);
+            
+            // Capas WMS e Híbridas
+            const baseMap = L.tileLayer('https://{{s}}.basemaps.cartocdn.com/dark_all/{{z}}/{{x}}/{{y}}{{r}}.png').addTo(map);
+            const pnoa = L.tileLayer.wms("https://www.ign.es/wms-inspire/pnoa-ma", {{ layers: 'OI.OrthoimageCoverage', format: 'image/png' }});
+            const catastro = L.tileLayer.wms("https://ovc.catastro.meh.es/ovcservweb/OVCSWMS.asmx", {{ layers: 'Catastro', format: 'image/png', transparent: true }}).addTo(map);
 
-            const cartoDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                attribution: '©OpenStreetMap, ©CartoDB'
-            }).addTo(map);
+            L.control.layers({{ "Vista Nocturna": baseMap, "Ortofoto Satélite": pnoa }}, {{ "Catastro Oficial": catastro }}).addTo(map);
 
-            const pnoa = L.tileLayer.wms("https://www.ign.es/wms-inspire/pnoa-ma", {
-                layers: 'OI.OrthoimageCoverage', format: 'image/png', transparent: false, attribution: "IGN"
-            });
-
-            const catastroWMS = L.tileLayer.wms("https://ovc.catastro.meh.es/ovcservweb/OVCSWMS.asmx", {
-                layers: 'Catastro', format: 'image/png', transparent: true, attribution: "Sede Catastro"
-            }).addTo(map);
-
-            L.control.layers({"Nocturno": cartoDark, "Satélite Real": pnoa}, {"Capa Catastral": catastroWMS}).addTo(map);
-
-            async function buscarFinca() {
+            async function ejecutarAnalisis() {{
                 const ref = document.getElementById('refInput').value;
                 if(!ref) return;
-                
-                document.getElementById('loading').classList.remove('hidden');
-                
-                try {
-                    const res = await fetch('/api/analizar', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({referencia_catastral: ref})
-                    });
-                    const result = await res.json();
-                    document.getElementById('loading').classList.add('hidden');
 
-                    if(result.status === 'success') {
-                        const { lat, lon } = result.data.coords;
-                        if(lat && lon) {
-                            map.flyTo([lat, lon], 18, { animate: true, duration: 2 });
-                            L.circleMarker([lat, lon], { color: '#3b82f6', radius: 10 }).addTo(map)
-                             .bindPopup(`<b>${result.data.referencia}</b>`).openPopup();
-                        }
-                        renderResult(result.data);
-                    }
-                } catch(e) { 
-                    alert("Error en el servidor");
-                    document.getElementById('loading').classList.add('hidden');
-                }
-            }
+                const response = await fetch('/api/analizar', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ referencia_catastral: ref }})
+                }});
+                const res = await response.json();
 
-            function renderResult(data) {
-                const list = document.getElementById('log-list');
-                const card = document.createElement('div');
-                card.className = "glass-card p-4 border-l-4 border-blue-500 animate-fade-in";
-                card.innerHTML = `
-                    <div class="flex justify-between items-start mb-3">
-                        <div>
-                            <h4 class="font-bold text-white text-sm">${data.referencia}</h4>
-                            <span class="text-[10px] bg-blue-900/50 text-blue-300 px-2 py-1 rounded">PROCESADO</span>
+                if(res.status === 'success') {{
+                    const data = res.data;
+                    map.flyTo([data.coords.lat, data.coords.lon], 18);
+                    
+                    const feed = document.getElementById('resultsFeed');
+                    if(feed.querySelector('p')) feed.innerHTML = ''; // Limpiar mensaje inicial
+
+                    const card = document.createElement('div');
+                    card.className = "card-gradient border border-slate-700 p-5 rounded-2xl animate-in slide-in-from-left duration-500";
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h4 class="font-bold text-blue-400">${{data.referencia}}</h4>
+                                <p class="text-[10px] text-slate-400">Superficie: ${{data.metricas.catastral}}</p>
+                            </div>
+                            <span class="${{data.metricas.alerta ? 'bg-red-900/30 text-red-400' : 'bg-green-900/30 text-green-400'}} text-[9px] font-bold px-2 py-1 rounded">
+                                ${{data.metricas.alerta ? 'DISCREPANCIA DETECTADA' : 'GEOMETRÍA OK'}}
+                            </span>
                         </div>
-                        <span class="text-[10px] text-slate-500">${new Date().toLocaleTimeString()}</span>
-                    </div>
-                    <div class="grid grid-cols-2 gap-2 mt-4">
-                        <a href="${data.pdf_url}" target="_blank" class="text-center text-xs bg-slate-800 hover:bg-slate-700 p-2 rounded border border-slate-600">📄 Informe PDF</a>
-                        <a href="${data.zip_url}" class="text-center text-xs bg-blue-600 hover:bg-blue-500 p-2 rounded font-bold">📦 Pack ZIP</a>
-                    </div>
-                `;
-                list.prepend(card);
-            }
-
-            async function subirKML() {
-                const files = document.getElementById('fileInput').files;
-                if(files.length === 0) return;
-                const formData = new FormData();
-                for(let f of files) formData.append('files', f);
-                
-                const res = await fetch('/api/upload-vector', { method: 'POST', body: formData });
-                const data = await res.json();
-                data.analisis.forEach(item => {
-                    renderResult({referencia: item.ref, zip_url: item.zip, pdf_url: "#"});
-                });
-            }
+                        <div class="grid grid-cols-1 gap-2">
+                            <a href="${{data.pdf_url}}" target="_blank" class="block text-center text-xs bg-white/5 hover:bg-white/10 py-3 rounded-lg border border-white/10 transition-all">ABRIR INFORME TÉCNICO</a>
+                            <a href="${{data.zip_url}}" class="block text-center text-xs bg-blue-600 hover:bg-blue-500 font-bold py-3 rounded-lg shadow-lg">DESCARGAR PAQUETE ZIP</a>
+                        </div>
+                    `;
+                    feed.prepend(card);
+                }
+            }}
         </script>
     </body>
     </html>
