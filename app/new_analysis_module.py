@@ -1,1 +1,90 @@
-浩潰瑲漠ੳ浩潰瑲樠潳੮牦浯瀠瑡汨扩椠灭牯⁴慐桴昊潲⁭祴楰杮椠灭牯⁴楄瑣‬楌瑳昊潲⁭慤整楴敭椠灭牯⁴慤整楴敭椊灭牯⁴潬杧湩੧浩潰瑲朠潥慰摮獡愠⁳灧੤潬杧牥㴠氠杯楧杮朮瑥潌杧牥弨湟浡彥⥟挊慬獳䄠癤湡散䅤慮祬楳䵳摯汵㩥 †搠晥张楟楮彴⡟敳晬‬畯灴瑵摟物›瑳⁲‽⼢灡⽰灡⽰畯灴瑵≳㨩 †††猠汥⹦畯灴瑵摟物㴠倠瑡⡨畯灴瑵摟物਩††††敳晬漮瑵異彴楤⹲歭楤⡲慰敲瑮㵳牔敵‬硥獩彴歯吽畲⥥ †††氠杯敧⹲湩潦∨䅛癤湡散䅤慮祬楳䵳摯汵嵥䤠楮楣污穩摡≯਩††敤⁦牰捯獥牡慟捲楨潶⡳敳晬‬牡档癩獯敟瑮慲慤›楌瑳獛牴⥝ⴠ‾楌瑳䑛捩嵴਺††††敲畳瑬摡獯㴠嬠੝††††潦⁲牡档癩⁯湩愠捲楨潶彳湥牴摡㩡 †††††琠祲਺††††††††敲畳瑬摡⁯‽敳晬弮牰捯獥牡慟捲楨潶愨捲楨潶਩††††††††敲畳瑬摡獯愮灰湥⡤敲畳瑬摡⥯ †††††攠捸灥⁴硅散瑰潩⁮獡攠਺††††††††潬杧牥攮牲牯昨嬢摁慶据摥湁污獹獩潍畤敬⁝牅潲㩲笠絥⤢ †††††††爠獥汵慴潤⹳灡数摮笨愢捲楨潶㨢愠捲楨潶‬攢牲牯㨢猠牴攨紩਩††††敲畴湲爠獥汵慴潤ੳ††敤⁦灟潲散慳彲牡档癩⡯敳晬‬牡档癩㩯猠牴 㸭䐠捩㩴 †††愠捲楨潶灟瑡⁨‽慐桴愨捲楨潶਩††††潬杧牥椮普⡯≦䅛癤湡散䅤慮祬楳䵳摯汵嵥倠潲散慳摮㩯笠牡档癩彯慰桴渮浡絥⤢ †††椠⁦牡档癩彯慰桴献晵楦⹸潬敷⡲ 㴽✠欮汭㨧 †††††朠潥獪湯㴠猠汥⹦灟牡敳牡歟汭愨捲楨潶灟瑡⥨ †††攠楬⁦牡档癩彯慰桴献晵楦⹸潬敷⡲ 湩嬠⸧敧橯潳❮‬⸧獪湯崧਺††††††敧橯潳⁮‽敳晬弮慰獲慥彲敧橯潳⡮牡档癩彯慰桴਩††††汥敳਺††††††慲獩⁥慖畬䕥牲牯昨䘢牯慭潴渠⁯潳潰瑲摡㩯笠牡档癩彯慰桴献晵楦絸⤢ †††挠牡数慴獟污摩⁡‽敳晬漮瑵異彴楤⁲ 牡档癩彯慰桴献整੭††††慣灲瑥彡慳楬慤洮摫物瀨牡湥獴吽畲ⱥ攠楸瑳潟㵫牔敵਩††††敧橯潳彮慰桴㴠挠牡数慴獟污摩⁡ ≦慻捲楨潶灟瑡⹨瑳浥⹽敧橯潳≮ †††眠瑩⁨灯湥木潥獪湯灟瑡ⱨ✠❷‬湥潣楤杮✽瑵ⵦ✸ 獡映਺††††††獪湯搮浵⡰敧橯潳Ɱ映‬湩敤瑮㈽਩††††湡污獩獩㴠猠汥⹦束湥牥牡慟慮楬楳⡳敧橯潳⥮ †††猠汥⹦束湥牥牡浟灡彡瑨汭木潥獪湯‬慣灲瑥彡慳楬慤⼠映笢牡档癩彯慰桴献整絭浟灡⹡瑨汭⤢ †††爠瑥牵⁮≻牡档癩≯›牡档癩彯慰桴渮浡ⱥ∠慣灲瑥彡慳楬慤㨢猠牴挨牡数慴獟污摩⥡‬朢潥獪湯㨢猠牴木潥獪湯灟瑡⥨‬愢慮楬楳≳›湡污獩獩੽††敤⁦灟牡敳牡歟汭猨汥ⱦ欠汭灟瑡㩨倠瑡⥨ⴠ‾楄瑣਺††††牴㩹 †††††朠晤㴠朠摰爮慥彤楦敬猨牴欨汭灟瑡⥨਩††††††敲畴湲樠潳⹮潬摡⡳摧⹦潴機潳⡮⤩ †††攠捸灥⁴硅散瑰潩㩮 †††††爠瑥牵⁮敳晬弮慰獲慥彲浫彬慭畮污欨汭灟瑡⥨ †搠晥张慰獲慥彲浫彬慭畮污猨汥ⱦ欠汭灟瑡㩨倠瑡⥨ⴠ‾楄瑣਺††††浩潰瑲爠੥††††楷桴漠数⡮浫彬慰桴‬爧Ⱗ攠据摯湩㵧甧晴㠭⤧愠⁳㩦 †††††挠湯整瑮㴠映爮慥⡤਩††††潣牯彤慰瑴牥⁮‽❲挼潯摲湩瑡獥⠾屛層ⱳ⹜ⵜ⭝㰩振潯摲湩瑡獥✾ †††洠瑡档獥㴠爠⹥楦摮污⡬潣牯彤慰瑴牥Ɱ挠湯整瑮਩††††敦瑡牵獥㴠嬠੝††††潦⁲Ⱪ挠潯摲彳瑳⁲湩攠畮敭慲整洨瑡档獥㨩 †††††挠潯摲⁳‽嵛 †††††映牯瀠楯瑮椠⁮潣牯獤獟牴献牴灩⤨献汰瑩⤨਺††††††††慰瑲⁳‽潰湩⹴灳楬⡴Ⱗ⤧ †††††††椠⁦敬⡮慰瑲⥳㸠‽㨲 †††††††††琠祲਺††††††††††††潣牯獤愮灰湥⡤晛潬瑡瀨牡獴せ⥝‬汦慯⡴慰瑲孳崱崩਩††††††††††硥散瑰嘠污敵牅潲㩲 †††††††††††挠湯楴畮੥††††††晩氠湥挨潯摲⥳㸠‽㨳 †††††††映慥畴敲⹳灡数摮笨琢灹≥›䘢慥畴敲Ⱒ∠敧浯瑥祲㨢笠琢灹≥›倢汯杹湯Ⱒ∠潣牯楤慮整≳›捛潯摲嵳ⱽ∠牰灯牥楴獥㨢笠椢≤›絩⥽ †††爠瑥牵⁮≻祴数㨢∠敆瑡牵䍥汯敬瑣潩≮‬昢慥畴敲≳›敦瑡牵獥੽††敤⁦灟牡敳牡束潥獪湯猨汥ⱦ朠潥獪湯灟瑡㩨倠瑡⥨ⴠ‾楄瑣਺††††楷桴漠数⡮敧橯潳彮慰桴‬爧Ⱗ攠据摯湩㵧甧晴㠭⤧愠⁳㩦 †††††爠瑥牵⁮獪湯氮慯⡤⥦ †搠晥张敧敮慲彲湡污獩獩猨汥ⱦ朠潥獪湯›楄瑣 㸭䐠捩㩴 †††映慥畴敲⁳‽敧橯潳⹮敧⡴昧慥畴敲❳‬嵛਩††††湡污獩獩㴠笠琢瑯污晟慥畴敲≳›敬⡮敦瑡牵獥Ⱙ∠楴潰彳敧浯瑥楲≡›絻੽††††潢湵楤杮扟硯獥㴠嬠੝††††潦⁲敦瑡牵⁥湩映慥畴敲㩳 †††††朠潥彭祴数㴠映慥畴敲朮瑥✨敧浯瑥祲Ⱗ笠⥽朮瑥✨祴数Ⱗ✠敤捳湯捯摩❯਩††††††湡污獩獩≛楴潰彳敧浯瑥楲≡孝敧浯瑟灹嵥㴠愠慮楬楳孳琢灩獯束潥敭牴慩崢朮瑥木潥彭祴数‬⤰⬠ㄠ †††††朠潥⁭‽敦瑡牵⹥敧⡴朧潥敭牴❹‬絻਩††††††晩朠潥⹭敧⡴琧灹❥ 㴽✠潐祬潧❮਺††††††††潣牯獤㴠朠潥⹭敧⡴挧潯摲湩瑡獥Ⱗ嬠嵛⥝せ੝††††††††晩挠潯摲㩳 †††††††††戠畯摮湩彧潢數⹳灡数摮笨洢湩江湯㨢洠湩挨せ⁝潦⁲⁣湩挠潯摲⥳‬洢硡江湯㨢洠硡挨せ⁝潦⁲⁣湩挠潯摲⥳‬洢湩江瑡㨢洠湩挨ㅛ⁝潦⁲⁣湩挠潯摲⥳‬洢硡江瑡㨢洠硡挨ㅛ⁝潦⁲⁣湩挠潯摲⥳⥽ †††椠⁦潢湵楤杮扟硯獥਺††††††湡污獩獩≛潢湵楤杮扟硯崢㴠笠洢湩江湯㨢洠湩戨≛業彮潬≮⁝潦⁲⁢湩戠畯摮湩彧潢數⥳‬洢硡江湯㨢洠硡戨≛慭彸潬≮⁝潦⁲⁢湩戠畯摮湩彧潢數⥳‬洢湩江瑡㨢洠湩戨≛業彮慬≴⁝潦⁲⁢湩戠畯摮湩彧潢數⥳‬洢硡江瑡㨢洠硡戨≛慭彸慬≴⁝潦⁲⁢湩戠畯摮湩彧潢數⥳੽††††敲畴湲愠慮楬楳ੳ††敤⁦束湥牥牡浟灡彡瑨汭猨汥ⱦ朠潥獪湯›楄瑣‬畯灴瑵灟瑡㩨倠瑡⥨਺††††瑨汭㴠∠∢ℼ佄呃偙⁅瑨汭㰾瑨汭㰾敨摡㰾敭慴挠慨獲瑥∽瑵ⵦ∸㰾楴汴㹥慍慰搠⁥湁污獩獩⼼楴汴㹥氼湩⁫敲㵬猢祴敬桳敥≴栠敲㵦栢瑴獰⼺甯灮杫挮浯氯慥汦瑥ㅀ㤮㐮搯獩⽴敬晡敬⹴獣≳⼠㰾捳楲瑰猠捲∽瑨灴㩳⼯湵歰⹧潣⽭敬晡敬䁴⸱⸹⼴楤瑳氯慥汦瑥樮≳㰾猯牣灩㹴猼祴敬戾摯筹慭杲湩〺瀻摡楤杮㈺瀰㭸潦瑮昭浡汩㩹牁慩㭬⍽慭筰敨杩瑨㘺〰硰眻摩桴ㄺ〰㬥㱽猯祴敬㰾栯慥㹤戼摯㹹格㸱湁污獩獩搠⁥慐捲汥獡⼼ㅨ㰾楤⁶摩∽慭≰㰾搯癩㰾捳楲瑰瘾牡洠灡㴠䰠洮灡✨慭❰⸩敳噴敩⡷㑛⸰ⰰⴠ⸳崰‬⤶䰻琮汩䱥祡牥✨瑨灴㩳⼯獻⹽楴敬漮数獮牴敥浴灡漮杲笯絺笯絸笯絹瀮杮Ⱗ笠瑡牴扩瑵潩㩮✠₩灏湥瑓敲瑥慍❰⥽愮摤潔洨灡㬩慶⁲慤慴㴠∠∢⬠樠潳⹮畤灭⡳敧橯潳⥮⬠∠∢䰻朮潥半乏搨瑡ⱡ笠瑳汹㩥笠潣潬㩲✠㌣㠳昸❦‬敷杩瑨›紲‬湯慅档敆瑡牵㩥映湵瑣潩⡮ⱦ⥬楻⡦⹦牰灯牥楴獥笩⹬楢摮潐異⡰半乏献牴湩楧祦昨瀮潲数瑲敩⥳㬩絽⥽愮摤潔洨灡㬩⼼捳楲瑰㰾戯摯㹹⼼瑨汭∾∢ †††眠瑩⁨灯湥漨瑵異彴慰桴‬眧Ⱗ攠据摯湩㵧甧晴㠭⤧愠⁳㩦 †††††映眮楲整栨浴⥬搊晥瀠潲散慳彲慰捲汥獡损獵潴⡭牡档癩獯敟瑮慲慤›楌瑳獛牴ⱝ搠物捥潴楲彯慳楬慤›瑳Ⱳ戠獡彥慣慰彳慰桴›瑳⁲‽⼢灡⽰灡⽰慣慰≳ 㸭䰠獩孴楄瑣㩝 †洠摯汵⁯‽摁慶据摥湁污獹獩潍畤敬漨瑵異彴楤㵲楤敲瑣牯潩獟污摩⥡ †爠瑥牵⁮潭畤潬瀮潲散慳彲牡档癩獯愨捲楨潶彳湥牴摡⥡਍
+import os
+import json
+from pathlib import Path
+from typing import Dict, List
+from datetime import datetime
+import logging
+import geopandas as gpd
+logger = logging.getLogger(__name__)
+class AdvancedAnalysisModule:
+    def __init__(self, output_dir: str = "/app/app/outputs"):
+        self.output_dir = Path(output_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        logger.info("[AdvancedAnalysisModule] Inicializado")
+    def procesar_archivos(self, archivos_entrada: List[str]) -> List[Dict]:
+        resultados = []
+        for archivo in archivos_entrada:
+            try:
+                resultado = self._procesar_archivo(archivo)
+                resultados.append(resultado)
+            except Exception as e:
+                logger.error(f"[AdvancedAnalysisModule] Error: {e}")
+                resultados.append({"archivo": archivo, "error": str(e)})
+        return resultados
+    def _procesar_archivo(self, archivo: str) -> Dict:
+        archivo_path = Path(archivo)
+        logger.info(f"[AdvancedAnalysisModule] Procesando: {archivo_path.name}")
+        if archivo_path.suffix.lower() == '.kml':
+            geojson = self._parsear_kml(archivo_path)
+        elif archivo_path.suffix.lower() in ['.geojson', '.json']:
+            geojson = self._parsear_geojson(archivo_path)
+        else:
+            raise ValueError(f"Formato no soportado: {archivo_path.suffix}")
+        carpeta_salida = self.output_dir / archivo_path.stem
+        carpeta_salida.mkdir(parents=True, exist_ok=True)
+        geojson_path = carpeta_salida / f"{archivo_path.stem}.geojson"
+        with open(geojson_path, 'w', encoding='utf-8') as f:
+            json.dump(geojson, f, indent=2)
+        analisis = self._generar_analisis(geojson)
+        self._generar_mapa_html(geojson, carpeta_salida / f"{archivo_path.stem}_mapa.html")
+        return {"archivo": archivo_path.name, "carpeta_salida": str(carpeta_salida), "geojson": str(geojson_path), "analisis": analisis}
+    def _parsear_kml(self, kml_path: Path) -> Dict:
+        try:
+            gdf = gpd.read_file(str(kml_path))
+            return json.loads(gdf.to_json())
+        except Exception:
+            return self._parsear_kml_manual(kml_path)
+    def _parsear_kml_manual(self, kml_path: Path) -> Dict:
+        import re
+        with open(kml_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        coord_pattern = r'<coordinates>([\d\s,\.\-]+)</coordinates>'
+        matches = re.findall(coord_pattern, content)
+        features = []
+        for i, coords_str in enumerate(matches):
+            coords = []
+            for point in coords_str.strip().split():
+                parts = point.split(',')
+                if len(parts) >= 2:
+                    try:
+                        coords.append([float(parts[0]), float(parts[1])])
+                    except ValueError:
+                        continue
+            if len(coords) >= 3:
+                features.append({"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [coords]}, "properties": {"id": i}})
+        return {"type": "FeatureCollection", "features": features}
+    def _parsear_geojson(self, geojson_path: Path) -> Dict:
+        with open(geojson_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    def _generar_analisis(self, geojson: Dict) -> Dict:
+        features = geojson.get('features', [])
+        analisis = {"total_features": len(features), "tipos_geometria": {}}
+        bounding_boxes = []
+        for feature in features:
+            geom_type = feature.get('geometry', {}).get('type', 'desconocido')
+            analisis["tipos_geometria"][geom_type] = analisis["tipos_geometria"].get(geom_type, 0) + 1
+            geom = feature.get('geometry', {})
+            if geom.get('type') == 'Polygon':
+                coords = geom.get('coordinates', [[]])[0]
+                if coords:
+                    bounding_boxes.append({"min_lon": min(c[0] for c in coords), "max_lon": max(c[0] for c in coords), "min_lat": min(c[1] for c in coords), "max_lat": max(c[1] for c in coords)})
+        if bounding_boxes:
+            analisis["bounding_box"] = {"min_lon": min(b["min_lon"] for b in bounding_boxes), "max_lon": max(b["max_lon"] for b in bounding_boxes), "min_lat": min(b["min_lat"] for b in bounding_boxes), "max_lat": max(b["max_lat"] for b in bounding_boxes)}
+        return analisis
+    def _generar_mapa_html(self, geojson: Dict, output_path: Path):
+        html = """<!DOCTYPE html><html><head><meta charset="utf-8"><title>Mapa de Analisis</title><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>body{margin:0;padding:20px;font-family:Arial;}#map{height:600px;width:100%;}</style></head><body><h1>Analisis de Parcelas</h1><div id="map"></div><script>var map = L.map('map').setView([40.0, -3.0], 6);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution: '© OpenStreetMap'}).addTo(map);var data = """ + json.dumps(geojson) + """;L.geoJSON(data, {style: {color: '#3388ff', weight: 2}, onEachFeature: function(f,l){if(f.properties){l.bindPopup(JSON.stringify(f.properties));}}}).addTo(map);</script></body></html>"""
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(html)
+def procesar_parcelas_custom(archivos_entrada: List[str], directorio_salida: str, base_capas_path: str = "/app/app/capas") -> List[Dict]:
+    modulo = AdvancedAnalysisModule(output_dir=directorio_salida)
+    return modulo.procesar_archivos(archivos_entrada)
