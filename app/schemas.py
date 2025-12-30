@@ -1,1 +1,17 @@
-牦浯搠瑡瑥浩⁥浩潰瑲搠瑡瑥浩੥牦浯琠灹湩⁧浩潰瑲䰠獩ⱴ传瑰潩慮੬牦浯瀠摹湡楴⁣浩潰瑲䈠獡䵥摯汥‬楆汥੤汣獡⁳畑牥剹煥敵瑳䈨獡䵥摯汥㨩 †爠晥牥湥楣彡慣慴瑳慲㩬猠牴㴠䘠敩摬⸨⸮‬業彮敬杮桴ㄽⰴ洠硡江湥瑧㵨〲਩汣獡⁳慂捴剨煥敵瑳䈨獡䵥摯汥㨩 †爠晥牥湥楣獡›楌瑳獛牴੝汣獡⁳硅潰瑲灏楴湯⡳慂敳潍敤⥬਺††敧浯瑥楲㩡戠潯⁬‽牔敵 †搠瑡獯›潢汯㴠吠畲੥††晡捥楣湯獥›潢汯㴠吠畲੥汣獡⁳䵋䅌慮祬楳剳煥敵瑳䈨獡䵥摯汥㨩 †映汩獥›楌瑳獛牴੝汣獡⁳慃慴瑳潲敒灳湯敳䈨獡䵥摯汥㨩 †猠慴畴㩳猠牴 †搠瑡㩡传瑰潩慮孬楤瑣⁝‽潎敮 †搠瑥楡㩬传瑰潩慮孬瑳嵲㴠丠湯൥
+from datetime import datetime
+from typing import List, Optional, Dict
+from pydantic import BaseModel, Field
+class QueryRequest(BaseModel):
+    referencia_catastral: str = Field(..., min_length=14, max_length=20)
+class BatchRequest(BaseModel):
+    referencias: List[str]
+class ExportOptions(BaseModel):
+    geometria: bool = True
+    datos: bool = True
+    afecciones: bool = True
+class KMLAnalysisRequest(BaseModel):
+    files: List[str]
+class CatastroResponse(BaseModel):
+    status: str
+    data: Optional[Dict] = None
+    detail: Optional[str] = None
