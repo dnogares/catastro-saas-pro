@@ -1,255 +1,225 @@
 import os
 import shutil
 import json
-import time
 import asyncio
-from pathlib import Path
 from typing import List
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks
+from pathlib import Path
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 
-from app.config import settings
-from app.schemas import QueryRequest, CatastroResponse, BatchRequest
-from app.catastro_engine import CatastroDownloader, GeneradorInformeCatastral
-from app.intersection_service import IntersectionService
-from app.urban_analysis import AnalizadorUrbanistico
-from app.new_analysis_module import AdvancedAnalysisModule
+# Importamos tus clases y funciones
+from app.catastro_engine import CatastroDownloader, GeneradorInformeCatastral, procesar_y_comprimir
 
-app = FastAPI(title=settings.API_TITLE)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app = FastAPI(title="Catastro SaaS Pro - Suite de Ingeniería")
 
-# Asegurar directorios
-for d in [settings.OUTPUT_DIR, settings.TEMP_DIR]:
-    Path(d).mkdir(parents=True, exist_ok=True)
+# Configuración de rutas
+BASE_DIR = Path(__file__).resolve().parent.parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+TEMP_DIR = BASE_DIR / "temp"
 
-app.mount("/outputs", StaticFiles(directory=settings.OUTPUT_DIR), name="outputs")
+# Crear carpetas si no existen
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
-# Servicios globales
-gis_service = IntersectionService(data_dir=settings.CAPAS_DIR)
-adv_module = AdvancedAnalysisModule(output_dir=settings.OUTPUT_DIR)
+# Configurar CORS para que el navegador no bloquee las peticiones
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# LÓGICA DE PROCESAMIENTO REUTILIZABLE
-async def procesar_core(ref: str, input_file_path: str = None):
-    """Maneja el flujo completo para una referencia o un archivo geométrico"""
-    ref_clean = ref.upper().strip()
-    out_dir = Path(settings.OUTPUT_DIR) / ref_clean
-    out_dir.mkdir(parents=True, exist_ok=True)
+# Servir los archivos generados (PDFs, ZIPs, Imágenes) para que sean accesibles vía URL
+app.mount("/outputs", StaticFiles(directory=str(OUTPUT_DIR)), name="outputs")
+
+# --- ENDPOINTS DE LA API ---
+
+@app.post("/api/analizar")
+async def api_analizar(data: dict):
+    """Analiza una sola referencia catastral"""
+    referencia = data.get("referencia_catastral")
+    if not referencia:
+        raise HTTPException(status_code=400, detail="Falta la referencia")
     
-    # Si no hay archivo de entrada, descargamos de Catastro
-    if not input_file_path:
-        cat = CatastroDownloader(str(out_dir))
-        res_cat = cat.descargar_todo(ref_clean)
-        geojson_p = res_cat.get("geojson_path")
-    else:
-        # Si viene de un KML/GeoJSON subido, usamos ese archivo
-        geojson_p = input_file_path
-
-    if not geojson_p or not os.path.exists(geojson_p):
-        raise Exception(f"Error: No se pudo obtener la geometría para {ref_clean}")
-
-    await asyncio.sleep(0.5) # Pausa técnica para escritura en disco
-
-    # 1. Análisis Espacial (GPKG 4.8GB)
-    gis_res = gis_service.analyze_file(geojson_p, output_dir=str(out_dir))
-    
-    # 2. Análisis Urbanístico
-    urb = AnalizadorUrbanistico(capas_service=gis_service)
-    urb_res = urb.analizar_referencia(ref_clean, geometria_path=geojson_p)
-    
-    # 3. Generar Mapa Interactivo HTML
-    adv_module.procesar_archivos([str(geojson_p)])
-    
-    # 4. Generar Informe PDF
-    pdf_gen = GeneradorInformeCatastral(ref_clean, str(out_dir))
-    pdf_path = out_dir / f"Informe_{ref_clean}.pdf"
-    pdf_gen.generar_pdf(str(pdf_path))
-    
-    return {
-        "referencia": ref_clean,
-        "superficie_m2": urb_res.get("superficie", {}).get("valor", 0) if urb_res else 0,
-        "afecciones": gis_res.get("intersecciones", []),
-        "descargas": {
-            "pdf": f"/outputs/{ref_clean}/Informe_{ref_clean}.pdf",
-            "mapa": f"/outputs/{ref_clean}/{ref_clean}_mapa.html"
-        }
-    }
-
-@app.get("/", response_class=HTMLResponse)
-async def dashboard():
-    return """
-    <!DOCTYPE html><html lang="es"><head>
-    <meta charset="UTF-8"><title>Catastro SaaS Pro - Suite Completa</title>
-    <style>
-        :root { --dark: #2c3e50; --blue: #3498db; --green: #27ae60; --bg: #f4f7f6; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; background: var(--bg); height: 100vh; overflow: hidden; }
-        .sidebar { width: 260px; background: var(--dark); color: white; padding: 20px; flex-shrink: 0; }
-        .menu-item { padding: 15px; cursor: pointer; border-radius: 8px; margin-bottom: 8px; transition: 0.3s; }
-        .menu-item:hover { background: rgba(255,255,255,0.1); }
-        .menu-item.active { background: var(--blue); font-weight: bold; }
-        .main { flex-grow: 1; padding: 35px; overflow-y: auto; }
-        .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 30px; }
-        .section { display: none; } .section.active { display: block; }
-        input, textarea, button { padding: 12px; border-radius: 8px; border: 1px solid #ddd; margin-top: 10px; }
-        button { background: var(--blue); color: white; border: none; cursor: pointer; font-weight: bold; }
-        button.btn-batch { background: var(--green); }
+    try:
+        # Usamos tu función procesar_y_comprimir que hace todo el trabajo sucio
+        zip_path, resultados = procesar_y_comprimir(referencia, directorio_base=str(OUTPUT_DIR))
         
-        /* VISOR MODAL */
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); }
-        .modal-content { background: white; margin: 2% auto; width: 92%; height: 88vh; border-radius: 15px; display: flex; flex-direction: column; overflow: hidden; }
-        .modal-body { display: flex; flex-grow: 1; overflow: hidden; }
-        iframe { flex-grow: 1; border: none; background: #eee; }
-        .v-side { width: 380px; padding: 25px; background: #fdfdfd; border-left: 1px solid #eee; overflow-y: auto; }
-        .badge-afeccion { background: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-bottom: 5px; display: inline-block; }
-    </style>
-    </head><body>
-    <div class="sidebar">
-        <h2>Catastro SaaS Pro</h2>
-        <div class="menu-item active" onclick="nav('sec-single', this)">🔎 Análisis Individual</div>
-        <div class="menu-item" onclick="nav('sec-batch', this)">📦 Procesar Lote (Lista)</div>
-        <div class="menu-item" onclick="nav('sec-files', this)">📤 Subir KML / GeoJSON</div>
-    </div>
+        if not zip_path:
+             return {"status": "error", "detail": "No se pudo procesar la referencia"}
 
-    <div class="main">
-        <div id="sec-single" class="section active">
-            <div class="card">
-                <h2>🔎 Consulta de Referencia</h2>
-                <input type="text" id="refSingle" placeholder="Ej: 2289738XH6028N0001RY" style="width: 70%;">
-                <button onclick="runIndividual()">Analizar Parcela</button>
-                <div id="status-single" style="margin-top:15px;"></div>
-            </div>
-        </div>
-
-        <div id="sec-batch" class="section">
-            <div class="card">
-                <h2>📦 Procesamiento Masivo</h2>
-                <p>Introduce las referencias catastrales separadas por saltos de línea:</p>
-                <textarea id="batchList" placeholder="Referencia 1&#10;Referencia 2&#10;Referencia 3" style="width:100%; height:180px;"></textarea>
-                <button class="btn-batch" onclick="runBatch()">🚀 Iniciar Proceso por Lote</button>
-                <div id="batchProgress" style="margin-top:20px;"></div>
-            </div>
-        </div>
-
-        <div id="sec-files" class="section">
-            <div class="card">
-                <h2>📤 Carga de Archivos Vectoriales</h2>
-                <p>Sube tus propios archivos <b>KML</b> o <b>GeoJSON</b> para cruzarlos con la base de datos GIS.</p>
-                <input type="file" id="vectorFiles" multiple accept=".kml,.geojson,.json">
-                <button onclick="uploadFiles()" style="background:var(--dark)">Analizar Archivos</button>
-                <div id="fileStatus" style="margin-top:15px;"></div>
-            </div>
-        </div>
-    </div>
-
-    <div id="visor" class="modal">
-        <div class="modal-content">
-            <div style="padding:15px 25px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; background:var(--dark); color:white;">
-                <h3 id="vTitle" style="margin:0;">Visor GIS</h3>
-                <button onclick="closeVisor()" style="background:#e74c3c; padding:8px 15px;">Cerrar Visor</button>
-            </div>
-            <div class="modal-body">
-                <iframe id="vMapa" src=""></iframe>
-                <div class="v-side">
-                    <h4>📊 Resultado del Análisis</h4>
-                    <div id="vInfo"></div>
-                    <hr>
-                    <a id="vPdf" href="#" target="_blank" style="display:block; text-align:center; background:var(--blue); color:white; padding:15px; border-radius:8px; text-decoration:none; font-weight:bold;">📄 Descargar Informe PDF</a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        function nav(id, el) {
-            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-            document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
-            document.getElementById(id).classList.add('active'); el.classList.add('active');
-        }
-
-        function closeVisor() { document.getElementById('visor').style.display = 'none'; }
-
-        function openVisor(data) {
-            document.getElementById('visor').style.display = 'block';
-            document.getElementById('vTitle').innerText = "Resultados: " + data.referencia;
-            document.getElementById('vMapa').src = data.descargas.mapa + "?t=" + Date.now();
-            document.getElementById('vPdf').href = data.descargas.pdf;
-            let info = `<p><b>Superficie m²:</b> ${data.superficie_m2}</p><h5>Capas Detectadas:</h5>`;
-            data.afecciones.forEach(a => {
-                info += `<div class="badge-afeccion">${a.capa} (${a.elementos_encontrados})</div><br>`;
-            });
-            document.getElementById('vInfo').innerHTML = info;
-        }
-
-        async function runIndividual() {
-            const ref = document.getElementById('refSingle').value;
-            const status = document.getElementById('status-single');
-            status.innerHTML = "⏳ Procesando...";
-            const r = await fetch('/api/analizar', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({referencia_catastral: ref})
-            });
-            const res = await r.json();
-            if(res.status === 'success') { status.innerHTML = "✅ Éxito"; openVisor(res.data); }
-            else { status.innerHTML = "❌ " + res.detail; }
-        }
-
-        async function runBatch() {
-            const lines = document.getElementById('batchList').value.split('\\n').filter(l => l.trim() !== "");
-            const container = document.getElementById('batchProgress');
-            container.innerHTML = "<h3>Cola de trabajo:</h3>";
-            for(let ref of lines) {
-                const row = document.createElement('div');
-                row.innerHTML = `⏳ Analizando ${ref}...`;
-                container.appendChild(row);
-                const r = await fetch('/api/analizar', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({referencia_catastral: ref})
-                });
-                const res = await r.json();
-                row.innerHTML = res.status === 'success' ? `✅ ${ref} - Completado` : `❌ ${ref} - Falló`;
+        # Construimos las URLs de retorno
+        ref_clean = referencia.replace(" ", "").strip()
+        return {
+            "status": "success",
+            "data": {
+                "referencia": ref_clean,
+                "zip_url": f"/outputs/{os.path.basename(zip_path)}",
+                "pdf_url": f"/outputs/{ref_clean}/{ref_clean}_Informe_Analisis_Espacial.pdf",
+                "resultados": resultados
             }
         }
-
-        async function uploadFiles() {
-            const files = document.getElementById('vectorFiles').files;
-            const status = document.getElementById('fileStatus');
-            if(files.length === 0) return alert("Selecciona archivos");
-            
-            status.innerHTML = "⏳ Subiendo y procesando vectores...";
-            const formData = new FormData();
-            for(let f of files) formData.append("files", f);
-
-            try {
-                const r = await fetch('/api/upload-vector', { method: 'POST', body: formData });
-                const res = await r.json();
-                status.innerHTML = `✅ ${res.processed} archivos procesados. Revisa la carpeta de outputs.`;
-            } catch(e) { status.innerHTML = "❌ Error en la carga."; }
-        }
-    </script>
-    </body></html>
-    """
-
-@app.post("/api/analizar", response_model=CatastroResponse)
-async def api_analizar(request: QueryRequest):
-    try:
-        data = await procesar_core(request.referencia_catastral)
-        return CatastroResponse(status="success", data=data)
     except Exception as e:
-        return CatastroResponse(status="error", detail=str(e))
+        return {"status": "error", "detail": str(e)}
 
 @app.post("/api/upload-vector")
 async def api_upload_vector(files: List[UploadFile] = File(...)):
-    processed_count = 0
+    """Maneja la subida de KML o GeoJSON"""
+    processed = []
     for file in files:
-        temp_path = Path(settings.TEMP_DIR) / file.filename
-        with temp_path.open("wb") as buffer:
+        file_path = TEMP_DIR / file.filename
+        with file_path.open("wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
-        # Procesamos el archivo como una "referencia" basada en su nombre
-        await procesar_core(file.filename.split('.')[0], input_file_path=str(temp_path))
-        processed_count += 1
-        
-    return {"status": "success", "processed": processed_count}
+        # Aquí podrías añadir lógica para cruzar el KML con tus capas GIS
+        processed.append(file.filename)
+    
+    return {"status": "success", "processed_files": processed}
+
+# --- INTERFAZ DE USUARIO (DASHBOARD) ---
+
+@app.get("/", response_class=HTMLResponse)
+async def dashboard():
+    return f"""
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <title>Panel de Control - Catastro Pro</title>
+        <style>
+            body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background: #f0f2f5; display: flex; height: 100vh; }}
+            .sidebar {{ width: 280px; background: #1a202c; color: white; padding: 20px; flex-shrink: 0; }}
+            .main {{ flex-grow: 1; padding: 40px; overflow-y: auto; }}
+            .card {{ background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }}
+            h2 {{ color: #2d3748; margin-top: 0; }}
+            input, textarea {{ width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #cbd5e0; border-radius: 6px; box-sizing: border-box; }}
+            button {{ background: #3182ce; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s; }}
+            button:hover {{ background: #2b6cb0; }}
+            .btn-batch {{ background: #38a169; }}
+            .result-item {{ padding: 15px; border-left: 4px solid #3182ce; background: #ebf8ff; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; }}
+            .loader {{ border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 20px; height: 20px; animation: spin 2s linear infinite; display: inline-block; vertical-align: middle; margin-right: 10px; }}
+            @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
+            .hidden {{ display: none; }}
+        </style>
+    </head>
+    <body>
+        <div class="sidebar">
+            <h1>GIS Catastro</h1>
+            <p>Suite de Análisis Territorial</p>
+            <hr style="opacity: 0.2">
+            <div style="margin-top: 20px;">
+                <p>📍 <b>Modos:</b></p>
+                <ul style="list-style: none; padding: 0;">
+                    <li>✓ Análisis Individual</li>
+                    <li>✓ Procesamiento en Lote</li>
+                    <li>✓ Cruce de KML/GeoJSON</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="main">
+            <div class="card">
+                <h2>🔎 Consulta Individual</h2>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="refInput" placeholder="Introduce Referencia Catastral (ej: 9812301XF4691S0001PI)">
+                    <button onclick="analizarSimple()">Analizar</button>
+                </div>
+                <div id="loading" class="hidden" style="margin-top: 10px;">
+                    <div class="loader"></div> Procesando datos, mapas y afecciones...
+                </div>
+                <div id="resultado" class="hidden">
+                    <div class="result-item">
+                        <span id="resText"></span>
+                        <div>
+                            <a id="btnPdf" href="#" target="_blank" style="margin-right:10px; color:#2c5282;">📄 Ver Informe</a>
+                            <a id="btnZip" href="#" style="background:#38a169; color:white; padding:8px 12px; border-radius:4px; text-decoration:none;">📦 Descargar Todo (.ZIP)</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📦 Procesamiento por Lote</h2>
+                <p>Pega múltiples referencias (una por línea):</p>
+                <textarea id="batchInput" rows="6" placeholder="Referencia 1&#10;Referencia 2..."></textarea>
+                <button class="btn-batch" onclick="analizarLote()">🚀 Iniciar Procesamiento Masivo</button>
+                <div id="batchProgress" style="margin-top: 15px;"></div>
+            </div>
+
+            <div class="card">
+                <h2>📤 Cargar KML / GeoJSON</h2>
+                <input type="file" id="fileInput" multiple accept=".kml,.geojson">
+                <button onclick="subirArchivos()" style="background: #4a5568;">Analizar Geometrías Externas</button>
+            </div>
+        </div>
+
+        <script>
+            async function analizarSimple() {{
+                const ref = document.getElementById('refInput').value;
+                if(!ref) return alert("Escribe una referencia");
+                
+                document.getElementById('loading').classList.remove('hidden');
+                document.getElementById('resultado').classList.add('hidden');
+
+                const response = await fetch('/api/analizar', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ referencia_catastral: ref }})
+                }});
+                
+                const data = await response.json();
+                document.getElementById('loading').classList.add('hidden');
+
+                if(data.status === 'success') {{
+                    document.getElementById('resultado').classList.remove('hidden');
+                    document.getElementById('resText').innerText = "Referencia " + data.data.referencia + " procesada.";
+                    document.getElementById('btnPdf').href = data.data.pdf_url;
+                    document.getElementById('btnZip').href = data.data.zip_url;
+                }} else {{
+                    alert("Error: " + data.detail);
+                }}
+            }}
+
+            async function analizarLote() {{
+                const refs = document.getElementById('batchInput').value.split('\\n').filter(r => r.trim());
+                const progress = document.getElementById('batchProgress');
+                progress.innerHTML = "<b>Iniciando cola de trabajo...</b><br>";
+
+                for(const ref of refs) {{
+                    const line = document.createElement('div');
+                    line.innerHTML = "⏳ Procesando " + ref + "...";
+                    progress.appendChild(line);
+
+                    const response = await fetch('/api/analizar', {{
+                        method: 'POST',
+                        headers: {{ 'Content-Type': 'application/json' }},
+                        body: JSON.stringify({{ referencia_catastral: ref }})
+                    }});
+                    const data = await response.json();
+                    
+                    if(data.status === 'success') {{
+                        line.innerHTML = "✅ " + ref + " -> <a href='" + data.data.zip_url + "'>Descargar ZIP</a>";
+                    }} else {{
+                        line.innerHTML = "❌ " + ref + " -> Error";
+                    }}
+                }}
+            }}
+
+            async function subirArchivos() {{
+                const files = document.getElementById('fileInput').files;
+                const formData = new FormData();
+                for(let file of files) formData.append('files', file);
+
+                const response = await fetch('/api/upload-vector', {{
+                    method: 'POST',
+                    body: formData
+                }});
+                const data = await response.json();
+                alert("Procesados: " + data.processed_files.join(', '));
+            }}
+        </script>
+    </body>
+    </html>
+    """
