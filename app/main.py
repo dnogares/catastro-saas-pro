@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 
-# Importaciones de tus módulos de lógica
+# Importación de tus módulos lógicos
 from app.config import settings
 from app.schemas import QueryRequest, CatastroResponse
 from app.catastro_engine import CatastroDownloader, GeneradorInformeCatastral
@@ -16,115 +16,120 @@ from app.new_analysis_module import AdvancedAnalysisModule
 
 app = FastAPI(title=settings.API_TITLE, version=settings.API_VERSION)
 
-# Configuración de CORS y Carpetas
+# Configuración de CORS y Directorios
 app.add_middleware(CORSMiddleware, allow_origins=settings.CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
-for d in [settings.OUTPUT_DIR, settings.TEMP_DIR]:
-    Path(d).mkdir(parents=True, exist_ok=True)
 
+for folder in [settings.OUTPUT_DIR, settings.TEMP_DIR]:
+    Path(folder).mkdir(parents=True, exist_ok=True)
+
+# Montaje de archivos estáticos para descargas y visor
 app.mount("/outputs", StaticFiles(directory=settings.OUTPUT_DIR), name="outputs")
 
-# Inicialización de servicios (Carga de capas GIS)
-intersection_service = IntersectionService(data_dir=settings.CAPAS_DIR)
+# Inicialización del Servicio GIS (Carga capas GPKG en memoria)
+gis_service = IntersectionService(data_dir=settings.CAPAS_DIR)
 
 @app.get("/", response_class=HTMLResponse)
-async def dashboard_principal():
+async def dashboard():
     return """
     <!DOCTYPE html><html lang="es"><head>
     <meta charset="UTF-8"><title>Catastro SaaS Pro - Dashboard</title>
     <style>
-        :root { --dark: #2c3e50; --blue: #3498db; --green: #27ae60; --gray: #f4f7f6; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; background: var(--gray); }
-        .sidebar { width: 260px; background: var(--dark); color: white; height: 100vh; padding: 20px; position: fixed; }
-        .main { margin-left: 300px; padding: 30px; width: calc(100% - 340px); }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 25px; }
-        input, button { padding: 12px; border-radius: 6px; border: 1px solid #ddd; margin-top: 10px; }
-        button { background: var(--blue); color: white; border: none; cursor: pointer; font-weight: bold; }
-        button:hover { opacity: 0.9; }
+        :root { --dark: #2c3e50; --blue: #3498db; --bg: #f8f9fa; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; background: var(--bg); }
+        .sidebar { width: 280px; background: var(--dark); color: white; height: 100vh; padding: 25px; position: fixed; }
+        .main { margin-left: 310px; padding: 30px; width: 100%; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 30px; }
+        input, button { padding: 12px; border-radius: 6px; border: 1px solid #ddd; font-size: 14px; }
+        button { background: var(--blue); color: white; border: none; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        button:hover { background: #2980b9; }
         
-        /* MODAL VISOR */
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); }
-        .modal-content { background: white; margin: 2% auto; padding: 20px; width: 90%; max-height: 90vh; border-radius: 10px; overflow-y: auto; }
-        .grid-visor { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        iframe { width: 100%; height: 500px; border: 1px solid #eee; border-radius: 8px; }
-        img { width: 100%; border-radius: 8px; }
+        /* VISOR MODAL */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); }
+        .modal-content { background: white; margin: 2% auto; padding: 25px; width: 90%; max-height: 90vh; border-radius: 12px; overflow-y: auto; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        iframe { width: 100%; height: 550px; border: 1px solid #eee; border-radius: 8px; }
+        .afecciones { background: #fdfdfd; padding: 15px; border: 1px solid #eee; border-radius: 8px; }
     </style>
     </head><body>
     <div class="sidebar">
-        <h2>Catastro SaaS Pro</h2>
-        <hr>
-        <p>📊 Dashboard Activo</p>
-        <p>🗺️ Capas GIS: Conectadas</p>
+        <h2>Catastro Pro</h2>
+        <p>Servicio GIS Activo</p>
+        <hr style="opacity: 0.2">
+        <nav>
+            <p>🏠 Dashboard</p>
+            <p>📂 Procesamiento KML</p>
+            <p>⚖️ Normativa Urbanística</p>
+        </nav>
     </div>
     <div class="main">
         <div class="card">
-            <h2>🔎 Análisis por Referencia Catastral</h2>
-            <input type="text" id="refInput" placeholder="Inserte referencia (14-20 caracteres)" style="width: 60%;">
-            <button onclick="ejecutarAnalisis()">Iniciar Análisis Completo</button>
-            <div id="status"></div>
+            <h2>🔎 Análisis de Parcela</h2>
+            <p>Introduce la referencia para consulta catastral, cruce de capas GIS e informe PDF.</p>
+            <input type="text" id="refInput" placeholder="Ej: 9812301XF4691S0001PI" style="width: 50%;">
+            <button onclick="lanzarProceso()">Iniciar Análisis</button>
+            <div id="status" style="margin-top: 15px;"></div>
         </div>
 
         <div class="card">
-            <h2>📂 Carga de Archivos (KML / GeoJSON)</h2>
-            <p>Sube archivos para cruzar con la base de datos GIS de 4.8GB.</p>
-            <input type="file" id="fileInput" multiple>
-            <button onclick="subirArchivo()" style="background: var(--green);">Analizar Documentos</button>
+            <h2>📤 Carga de Geometrías (KML / GeoJSON)</h2>
+            <input type="file" id="fileUpload" multiple>
+            <button onclick="subirFicheros()" style="background: #27ae60;">Analizar Archivos</button>
         </div>
     </div>
 
-    <div id="visor" class="modal">
+    <div id="visorModal" class="modal">
         <div class="modal-content">
-            <span onclick="this.parentElement.parentElement.style.display='none'" style="float:right; cursor:pointer; font-size:24px;">&times;</span>
-            <h2 id="visorTitle">Visor de Resultados</h2>
-            <div class="grid-visor">
+            <span onclick="cerrarVisor()" style="float:right; cursor:pointer; font-size:28px;">&times;</span>
+            <h2 id="vTitle">Resultado del Análisis</h2>
+            <div class="grid">
                 <div>
-                    <h3>Mapa Interactivo</h3>
-                    <iframe id="visorMapa"></iframe>
+                    <h3>🗺️ Mapa Interactivo</h3>
+                    <iframe id="vMapa"></iframe>
                 </div>
-                <div>
-                    <h3>Imagen de Situación / Catastro</h3>
-                    <img id="visorImg" src="">
-                    <div id="visorAfecciones" style="margin-top:20px; padding:15px; background:#f9f9f9; border-radius:8px;"></div>
+                <div class="afecciones">
+                    <h3>📑 Datos y Afecciones</h3>
+                    <div id="vData"></div>
+                    <hr>
+                    <a id="vPdf" href="" target="_blank" style="display:block; text-align:center; padding:15px; background:var(--blue); color:white; text-decoration:none; border-radius:6px;">Descargar Informe PDF</a>
                 </div>
-            </div>
-            <div style="text-align:center; margin-top:20px;">
-                <a id="linkPdf" href="" target="_blank" style="font-size:18px; color:var(--blue); font-weight:bold;">📄 Descargar Informe PDF Oficial</a>
             </div>
         </div>
     </div>
 
     <script>
-        async function ejecutarAnalisis() {
+        async function lanzarProceso() {
             const ref = document.getElementById('refInput').value;
             const status = document.getElementById('status');
-            status.innerHTML = "⏳ Procesando... consultando Catastro y cruce GIS.";
+            status.innerHTML = "⏳ <b>Procesando...</b> (Descargando Catastro y cruzando capas GIS)";
             
             try {
-                const res = await fetch('/api/analizar', {
+                const r = await fetch('/api/analizar', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({referencia_catastral: ref})
                 });
-                const data = await res.json();
-                if(data.status === 'success') {
-                    status.innerHTML = "✅ ¡Análisis completado!";
-                    mostrarVisor(data.data);
-                } else { status.innerHTML = "❌ Error: " + data.detail; }
-            } catch (e) { status.innerHTML = "❌ Error de conexión."; }
+                const res = await r.json();
+                if(res.status === 'success') {
+                    status.innerHTML = "✅ Análisis completado con éxito.";
+                    abrirVisor(res.data);
+                } else { status.innerHTML = "❌ Error: " + res.detail; }
+            } catch(e) { status.innerHTML = "❌ Error de conexión con el servidor."; }
         }
 
-        function mostrarVisor(data) {
-            document.getElementById('visor').style.display = 'block';
-            document.getElementById('visorTitle').innerText = "Resultados: " + data.referencia;
-            document.getElementById('visorMapa').src = data.descargas.mapa;
-            document.getElementById('visorImg').src = `/outputs/${data.referencia}/mapa_situacion.jpg`; // Si el motor genera JPG
-            document.getElementById('linkPdf').href = data.descargas.pdf;
+        function abrirVisor(data) {
+            document.getElementById('visorModal').style.display = 'block';
+            document.getElementById('vTitle').innerText = "Parcela: " + data.referencia;
+            document.getElementById('vMapa').src = data.descargas.mapa;
+            document.getElementById('vPdf').href = data.descargas.pdf;
             
-            let afeccionHtml = "<h4>Afecciones Detectadas:</h4><ul>";
+            let html = `<p><b>Superficie:</b> ${data.superficie_m2} m²</p><h4>Cruce de Capas GIS:</h4><ul>`;
             data.afecciones.forEach(a => {
-                afeccionHtml += `<li><b>${a.capa}</b>: ${a.elementos_encontrados} elementos</li>`;
+                html += `<li><b>${a.capa}:</b> ${a.elementos_encontrados} intersecciones</li>`;
             });
-            document.getElementById('visorAfecciones').innerHTML = afeccionHtml + "</ul>";
+            document.getElementById('vData').innerHTML = html + "</ul>";
         }
+
+        function cerrarVisor() { document.getElementById('visorModal').style.display = 'none'; }
     </script>
     </body></html>
     """
@@ -132,35 +137,35 @@ async def dashboard_principal():
 @app.post("/api/analizar", response_model=CatastroResponse)
 async def api_analizar(request: QueryRequest):
     ref = request.referencia_catastral.upper().strip()
-    out_dir = Path(settings.OUTPUT_DIR) / ref
-    out_dir.mkdir(parents=True, exist_ok=True)
+    path_ref = Path(settings.OUTPUT_DIR) / ref
+    path_ref.mkdir(parents=True, exist_ok=True)
 
     try:
-        # 1. Catastro
-        down = CatastroDownloader(str(out_dir))
-        c_data = down.descargar_todo(ref)
-        geojson = c_data.get("geojson_path")
+        # 1. Catastro: GeoJSON y Datos
+        catastro = CatastroDownloader(str(path_ref))
+        res_cat = catastro.descargar_todo(ref)
+        geojson_p = res_cat.get("geojson_path")
 
-        # 2. Cruce GIS (GPKG)
-        gis_res = intersection_service.analyze_file(geojson, output_dir=str(out_dir))
+        # 2. GIS: Intersección con GPKG
+        gis_res = gis_service.analyze_file(geojson_p, output_dir=str(path_ref))
 
-        # 3. Urbanismo
-        urb = AnalizadorUrbanistico(capas_service=intersection_service)
-        urb_res = urb.analizar_referencia(ref, geometria_path=geojson)
+        # 3. Urbanismo: Análisis de normativa
+        urb = AnalizadorUrbanistico(capas_service=gis_service)
+        urb_res = urb.analizar_referencia(ref, geometria_path=geojson_p)
 
-        # 4. Mapa Interactivo HTML
+        # 4. Leaflet: Mapa Interactivo
         adv = AdvancedAnalysisModule(output_dir=str(settings.OUTPUT_DIR))
-        adv.procesar_archivos([str(geojson)])
+        adv.procesar_archivos([str(geojson_p)])
 
-        # 5. PDF
-        pdf_gen = GeneradorInformeCatastral(ref, str(out_dir))
-        pdf_path = out_dir / f"Informe_{ref}.pdf"
-        pdf_gen.generar_pdf(str(pdf_path))
+        # 5. ReportLab: Generación de PDF
+        informe = GeneradorInformeCatastral(ref, str(path_ref))
+        pdf_path = path_ref / f"Informe_{ref}.pdf"
+        informe.generar_pdf(str(pdf_path))
 
         return CatastroResponse(status="success", data={
             "referencia": ref,
-            "afecciones": gis_res.get("intersecciones", []),
             "superficie_m2": urb_res.get("superficie", {}).get("valor"),
+            "afecciones": gis_res.get("intersecciones", []),
             "descargas": {
                 "pdf": f"/outputs/{ref}/Informe_{ref}.pdf",
                 "mapa": f"/outputs/{ref}/{ref}_mapa.html"
@@ -169,11 +174,6 @@ async def api_analizar(request: QueryRequest):
     except Exception as e:
         return CatastroResponse(status="error", detail=str(e))
 
-@app.post("/api/batch")
-async def batch_process(request: BatchRequest):
-    # Lógica para procesar múltiples referencias una tras otra
-    resultados = []
-    for ref in request.referencias:
-        # Aquí llamarías a la lógica de api_analizar para cada una
-        pass
-    return {"status": "success", "processed": len(request.referencias)}
+@app.get("/health")
+async def health():
+    return {"status": "ok", "capas": str(settings.CAPAS_DIR)}
