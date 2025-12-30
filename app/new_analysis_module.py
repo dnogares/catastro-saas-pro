@@ -1,174 +1,174 @@
 import os
-import shutil
 import json
-import time
-import asyncio
 from pathlib import Path
-from typing import List
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from typing import Dict, List
+import logging
+import geopandas as gpd
 
-from app.config import settings
-from app.schemas import QueryRequest, CatastroResponse, BatchRequest
-from app.catastro_engine import CatastroDownloader, GeneradorInformeCatastral
-from app.intersection_service import IntersectionService
-from app.urban_analysis import AnalizadorUrbanistico
-from app.new_analysis_module import AdvancedAnalysisModule
+logger = logging.getLogger(__name__)
 
-app = FastAPI(title=settings.API_TITLE)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+class AdvancedAnalysisModule:
+    def __init__(self, output_dir: str = "/app/app/outputs"):
+        # Aseguramos que la ruta sea absoluta y exista
+        self.output_dir = Path(output_dir).absolute()
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(f"[AdvancedAnalysisModule] Inicializado en {self.output_dir}")
 
-# Directorios
-for d in [settings.OUTPUT_DIR, settings.TEMP_DIR]:
-    Path(d).mkdir(parents=True, exist_ok=True)
+    def procesar_archivos(self, archivos_entrada: List[str]) -> List[Dict]:
+        resultados = []
+        for archivo in archivos_entrada:
+            try:
+                resultado = self._procesar_archivo(archivo)
+                resultados.append(resultado)
+            except Exception as e:
+                logger.error(f"[AdvancedAnalysisModule] Error procesando {archivo}: {e}")
+                resultados.append({"archivo": archivo, "error": str(e)})
+        return resultados
 
-app.mount("/outputs", StaticFiles(directory=settings.OUTPUT_DIR), name="outputs")
+    def _procesar_archivo(self, archivo: str) -> Dict:
+        archivo_path = Path(archivo)
+        logger.info(f"[AdvancedAnalysisModule] Procesando: {archivo_path.name}")
 
-# Servicios
-gis_service = IntersectionService(data_dir=settings.CAPAS_DIR)
-adv_module = AdvancedAnalysisModule(output_dir=settings.OUTPUT_DIR)
+        # 1. Parsing según extensión
+        if archivo_path.suffix.lower() == '.kml':
+            geojson = self._parsear_kml(archivo_path)
+        elif archivo_path.suffix.lower() in ['.geojson', '.json']:
+            geojson = self._parsear_geojson(archivo_path)
+        else:
+            raise ValueError(f"Formato no soportado: {archivo_path.suffix}")
 
-# Función interna de procesamiento (para reutilizar en individual y lote)
-async def procesar_referencia_core(ref: str):
-    ref = ref.upper().strip()
-    out_dir = Path(settings.OUTPUT_DIR) / ref
-    out_dir.mkdir(parents=True, exist_ok=True)
-    
-    cat = CatastroDownloader(str(out_dir))
-    res_cat = cat.descargar_todo(ref)
-    geojson_p = res_cat.get("geojson_path")
-    
-    if not geojson_p or not os.path.exists(geojson_p):
-        raise Exception(f"Referencia {ref}: No se obtuvo geometría.")
+        # 2. Definir carpeta de salida (por referencia/nombre de archivo)
+        # Usamos el stem (nombre sin extensión) como ID de carpeta
+        ref_id = archivo_path.stem
+        carpeta_salida = self.output_dir / ref_id
+        carpeta_salida.mkdir(parents=True, exist_ok=True)
 
-    # Simular espera de escritura
-    await asyncio.sleep(0.5)
+        # 3. Guardar GeoJSON procesado
+        geojson_path = carpeta_salida / f"{ref_id}.geojson"
+        with open(geojson_path, 'w', encoding='utf-8') as f:
+            json.dump(geojson, f, indent=2)
 
-    gis_res = gis_service.analyze_file(geojson_p, output_dir=str(out_dir))
-    urb = AnalizadorUrbanistico(capas_service=gis_service)
-    urb_res = urb.analizar_referencia(ref, geometria_path=geojson_p)
-    adv_module.procesar_archivos([str(geojson_p)])
-    
-    pdf_gen = GeneradorInformeCatastral(ref, str(out_dir))
-    pdf_path = out_dir / f"Informe_{ref}.pdf"
-    pdf_gen.generar_pdf(str(pdf_path))
-    
-    return {
-        "referencia": ref,
-        "superficie_m2": urb_res.get("superficie", {}).get("valor", 0) if urb_res else 0,
-        "afecciones": gis_res.get("intersecciones", []),
-        "descargas": {
-            "pdf": f"/outputs/{ref}/Informe_{ref}.pdf",
-            "mapa": f"/outputs/{ref}/{ref}_mapa.html"
-        }
-    }
+        # 4. Generar Mapa HTML y Análisis
+        analisis = self._generar_analisis(geojson)
+        path_mapa = carpeta_salida / f"{ref_id}_mapa.html"
+        self._generar_mapa_html(geojson, path_mapa, ref_id)
 
-@app.get("/", response_class=HTMLResponse)
-async def dashboard():
-    # El HTML incluye ahora la lógica de Lotes
-    return """
-    <!DOCTYPE html><html lang="es"><head>
-    <meta charset="UTF-8"><title>Catastro SaaS Pro - Lotes</title>
-    <style>
-        :root { --dark: #2c3e50; --blue: #3498db; --bg: #f4f7f6; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; background: var(--bg); height: 100vh; }
-        .sidebar { width: 250px; background: var(--dark); color: white; padding: 20px; flex-shrink: 0; }
-        .menu-item { padding: 12px; cursor: pointer; border-radius: 6px; margin-bottom: 5px; }
-        .menu-item.active { background: var(--blue); }
-        .main { flex-grow: 1; padding: 30px; overflow-y: auto; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 25px; }
-        .section { display: none; } .section.active { display: block; }
-        textarea { width: 100%; height: 150px; border-radius: 6px; border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; }
-        .progress-item { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
-    </style>
-    </head><body>
-    <div class="sidebar">
-        <h2>Catastro Pro</h2>
-        <div class="menu-item active" onclick="nav('sec-single', this)">🔎 Análisis Único</div>
-        <div class="menu-item" onclick="nav('sec-batch', this)">📦 Procesar Lote</div>
-    </div>
-    <div class="main">
-        <div id="sec-single" class="section active">
-            <div class="card">
-                <h2>Buscador Individual</h2>
-                <input type="text" id="refInput" placeholder="Referencia..." style="width: 300px; padding: 12px;">
-                <button onclick="lanzarIndividual()" style="padding: 12px 20px; background:var(--blue); color:white; border:none; border-radius:6px; cursor:pointer;">Analizar</button>
-                <div id="status-single"></div>
-            </div>
-        </div>
-        <div id="sec-batch" class="section">
-            <div class="card">
-                <h2>Procesamiento Masivo</h2>
-                <p>Pega una lista de referencias (una por línea):</p>
-                <textarea id="batchInput" placeholder="9812301XF4691S0001PI&#10;8712302XF4691S0001PI"></textarea>
-                <button onclick="lanzarLote()" style="padding: 12px 25px; background: #27ae60; color:white; border:none; border-radius:6px; cursor:pointer;">🚀 Iniciar Lote de Trabajo</button>
-                <div id="batchProgress" style="margin-top:20px;"></div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        function nav(id, el) {
-            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-            document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
-            document.getElementById(id).classList.add('active'); el.classList.add('active');
+        return {
+            "referencia": ref_id,
+            "archivo": archivo_path.name,
+            "carpeta_salida": str(carpeta_salida),
+            "geojson": str(geojson_path),
+            "mapa_html": str(path_mapa),
+            "analisis": analisis
         }
 
-        async function lanzarIndividual() {
-            const ref = document.getElementById('refInput').value;
-            const status = document.getElementById('status-single');
-            status.innerHTML = "⏳ Procesando...";
-            const r = await fetch('/api/analizar', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({referencia_catastral: ref})
-            });
-            const res = await r.json();
-            if(res.status === 'success') { status.innerHTML = "✅ ¡Listo! Mira los archivos en outputs/" + ref; }
-            else { status.innerHTML = "❌ " + res.detail; }
-        }
+    def _parsear_kml(self, kml_path: Path) -> Dict:
+        try:
+            # Intento con Geopandas (requiere fiona instalado)
+            gdf = gpd.read_file(str(kml_path))
+            return json.loads(gdf.to_json())
+        except Exception as e:
+            logger.warning(f"Fallo Geopandas en KML, intentando fallback manual: {e}")
+            return self._parsear_kml_manual(kml_path)
 
-        async function lanzarLote() {
-            const refs = document.getElementById('batchInput').value.split('\\n').filter(r => r.trim() !== "");
-            const container = document.getElementById('batchProgress');
-            container.innerHTML = "<h3>Progreso del Lote:</h3>";
+    def _parsear_kml_manual(self, kml_path: Path) -> Dict:
+        import re
+        with open(kml_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Regex básico para extraer coordenadas de Polígonos
+        coord_pattern = r'<coordinates>([\d\s,\.\-]+)</coordinates>'
+        matches = re.findall(coord_pattern, content)
+        features = []
+        
+        for i, coords_str in enumerate(matches):
+            coords = []
+            for point in coords_str.strip().split():
+                parts = point.split(',')
+                if len(parts) >= 2:
+                    try:
+                        coords.append([float(parts[0]), float(parts[1])])
+                    except ValueError:
+                        continue
             
-            for(let ref of refs) {
-                const item = document.createElement('div');
-                item.className = 'progress-item';
-                item.innerHTML = `<span>${ref}</span><span id="st-${ref}">⏳ Esperando...</span>`;
-                container.appendChild(item);
+            if len(coords) >= 3:
+                features.append({
+                    "type": "Feature",
+                    "geometry": {"type": "Polygon", "coordinates": [coords]},
+                    "properties": {"id": i, "source": "manual_kml_parser"}
+                })
+        
+        return {"type": "FeatureCollection", "features": features}
 
-                try {
-                    const r = await fetch('/api/analizar', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({referencia_catastral: ref})
-                    });
-                    const res = await r.json();
-                    document.getElementById('st-'+ref).innerText = res.status === 'success' ? "✅ Ok" : "❌ Error";
-                } catch(e) {
-                    document.getElementById('st-'+ref).innerText = "❌ Fallo conexión";
-                }
-            }
-        }
-    </script>
-    </body></html>
-    """
+    def _parsear_geojson(self, geojson_path: Path) -> Dict:
+        with open(geojson_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
 
-@app.post("/api/analizar", response_model=CatastroResponse)
-async def api_analizar(request: QueryRequest):
-    try:
-        data = await procesar_referencia_core(request.referencia_catastral)
-        return CatastroResponse(status="success", data=data)
-    except Exception as e:
-        return CatastroResponse(status="error", detail=str(e))
+    def _generar_analisis(self, geojson: Dict) -> Dict:
+        features = geojson.get('features', [])
+        analisis = {"total_features": len(features), "tipos_geometria": {}}
+        
+        for feature in features:
+            geom_type = feature.get('geometry', {}).get('type', 'desconocido')
+            analisis["tipos_geometria"][geom_type] = analisis["tipos_geometria"].get(geom_type, 0) + 1
+            
+        return analisis
 
-@app.post("/api/analizar-lote")
-async def api_lote(request: BatchRequest, background_tasks: BackgroundTasks):
-    # Esta opción es para procesos pesados en segundo plano
-    for ref in request.referencias:
-        background_tasks.add_task(procesar_referencia_core, ref)
-    return {"message": f"Iniciado procesamiento de {len(request.referencias)} referencias en segundo plano."}
+    def _generar_mapa_html(self, geojson: Dict, output_path: Path, ref_id: str):
+        # Mapa con auto-zoom al cargar (fitBounds)
+        html_template = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Mapa de Análisis - {ref_id}</title>
+            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            <style>
+                body {{ margin: 0; padding: 0; }}
+                #map {{ height: 100vh; width: 100%; }}
+                .info-box {{ position: absolute; top: 10px; left: 50px; z-index: 1000; background: white; padding: 10px; border-radius: 5px; box-shadow: 0 0 15px rgba(0,0,0,0.2); font-family: sans-serif; }}
+            </style>
+        </head>
+        <body>
+            <div class="info-box">Ref: {ref_id}</div>
+            <div id="map"></div>
+            <script>
+                var map = L.map('map');
+                
+                L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
+                    attribution: '© OpenStreetMap'
+                }}).addTo(map);
+
+                var data = {json.dumps(geojson)};
+                var geojsonLayer = L.geoJSON(data, {{
+                    style: {{
+                        color: '#3498db',
+                        weight: 3,
+                        opacity: 0.8,
+                        fillColor: '#3498db',
+                        fillOpacity: 0.2
+                    }},
+                    onEachFeature: function(f, l) {{
+                        if (f.properties) {{
+                            l.bindPopup("<pre>" + JSON.stringify(f.properties, null, 2) + "</pre>");
+                        }}
+                    }}
+                }}).addTo(map);
+
+                // Auto-zoom a la geometría
+                if (data.features.length > 0) {{
+                    map.fitBounds(geojsonLayer.getBounds());
+                }} else {{
+                    map.setView([40.4167, -3.7037], 6);
+                }}
+            </script>
+        </body>
+        </html>
+        """
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(html_template)
+
+def procesar_parcelas_custom(archivos_entrada: List[str], directorio_salida: str) -> List[Dict]:
+    modulo = AdvancedAnalysisModule(output_dir=directorio_salida)
+    return modulo.procesar_archivos(archivos_entrada)
