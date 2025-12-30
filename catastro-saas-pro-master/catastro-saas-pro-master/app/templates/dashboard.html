@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Catastro SaaS Pro</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="logo">Catastro SaaS Pro</a>
+            <div id="system-status">Verificando...</div>
+        </div>
+    </nav>
+
+    <main class="dashboard-container">
+        <div class="sidebar">
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="consulta">🔍 Consulta</button>
+                <button class="tab-btn" data-tab="urban">🏗️ Urbanismo</button>
+                <button class="tab-btn" data-tab="archivos">📂 Archivos</button>
+            </div>
+            
+            <div class="tab-content active" id="consulta">
+                <h3>Consulta Catastral</h3>
+                <form id="consulta-form">
+                    <input type="text" id="referencia" placeholder="Referencia (20 caracteres)" required>
+                    <button type="submit" class="btn-primary">Consultar</button>
+                </form>
+                <div id="consulta-result" class="result-box"></div>
+            </div>
+
+            <div class="tab-content" id="urban">
+                <h3>Análisis Urbanístico</h3>
+                <form id="urban-form">
+                    <input type="text" id="urban-ref" placeholder="Referencia Catastral">
+                    <button type="submit" class="btn-primary">Analizar Afecciones</button>
+                </form>
+                <div id="urban-result" class="result-box"></div>
+            </div>
+        </div>
+
+        <div class="map-section">
+            <div id="map"></div>
+        </div>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/static/js/main.js"></script>
+</body>
+</html>

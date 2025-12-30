@@ -1,0 +1,42 @@
+:root {
+    --primary: #2c3e50;
+    --accent: #3498db;
+    --success: #27ae60;
+    --danger: #e74c3c;
+    --bg: #f4f7f6;
+}
+
+body, html { height: 100%; margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg); overflow: hidden; }
+
+/* Layout Dashboard */
+.dashboard-wrapper { display: flex; height: 100vh; }
+
+/* Panel Lateral */
+.sidebar {
+    width: 420px; background: white; border-right: 1px solid #ddd;
+    padding: 25px; display: flex; flex-direction: column; z-index: 1000;
+}
+
+.sidebar h2 { color: var(--primary); margin-bottom: 20px; font-size: 1.4rem; }
+
+.form-group { margin-bottom: 15px; }
+input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+.btn-search { width: 100%; background: var(--primary); color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+
+/* Resultados */
+.result-card { margin-top: 20px; background: #fafafa; padding: 15px; border-radius: 8px; border: 1px solid #eee; }
+.btn-download { display: block; text-align: center; background: var(--success); color: white; padding: 10px; border-radius: 6px; text-decoration: none; margin: 15px 0; font-weight: bold; }
+
+.item-afeccion { background: white; padding: 10px; margin-bottom: 8px; border-radius: 4px; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.success-msg { color: var(--success); text-align: center; padding: 15px; background: #e8f5e9; border-radius: 6px; font-weight: bold; }
+
+/* Mapa */
+.map-container { flex-grow: 1; position: relative; }
+#map { height: 100%; width: 100%; }
+
+/* Animación de carga */
+.loader {
+    border: 4px solid #f3f3f3; border-top: 4px solid var(--accent);
+    border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto;
+}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
