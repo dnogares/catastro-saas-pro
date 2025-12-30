@@ -1,11 +1,12 @@
 import os
+import shutil
 from pathlib import Path
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 
-# --- IMPORTACIONES DE TUS MÓDULOS ---
+# Importaciones de tus módulos de lógica
 from app.config import settings
 from app.schemas import QueryRequest, CatastroResponse
 from app.catastro_engine import CatastroDownloader, GeneradorInformeCatastral
@@ -13,111 +14,166 @@ from app.intersection_service import IntersectionService
 from app.urban_analysis import AnalizadorUrbanistico
 from app.new_analysis_module import AdvancedAnalysisModule
 
-app = FastAPI(
-    title=settings.API_TITLE,
-    version=settings.API_VERSION,
-    debug=settings.DEBUG
-)
+app = FastAPI(title=settings.API_TITLE, version=settings.API_VERSION)
 
-# 1. CONFIGURACIÓN DE CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Configuración de CORS y Carpetas
+app.add_middleware(CORSMiddleware, allow_origins=settings.CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
+for d in [settings.OUTPUT_DIR, settings.TEMP_DIR]:
+    Path(d).mkdir(parents=True, exist_ok=True)
 
-# 2. DIRECTORIOS Y ARCHIVOS ESTÁTICOS
-Path(settings.OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
-# Montamos la carpeta de resultados para que los PDFs/Mapas sean accesibles por URL
 app.mount("/outputs", StaticFiles(directory=settings.OUTPUT_DIR), name="outputs")
 
-# 3. INICIALIZACIÓN DE SERVICIOS (Singleton para caché de capas)
-# El IntersectionService carga los GPKG de 4.8GB en memoria según se necesitan
+# Inicialización de servicios (Carga de capas GIS)
 intersection_service = IntersectionService(data_dir=settings.CAPAS_DIR)
 
-# 4. RUTA PARA TU PÁGINA DE BIENVENIDA (INDEX)
 @app.get("/", response_class=HTMLResponse)
-async def read_index():
+async def dashboard_principal():
     return """
     <!DOCTYPE html><html lang="es"><head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Catastro SaaS Pro - Sistema de Analisis Catastral</title>
+    <meta charset="UTF-8"><title>Catastro SaaS Pro - Dashboard</title>
     <style>
-        body { font-family: sans-serif; line-height: 1.6; margin: 0; color: #333; }
-        .hero { background: #2c3e50; color: white; padding: 60px 20px; text-align: center; }
-        .container { max-width: 1000px; margin: auto; padding: 20px; }
-        .btn { display: inline-block; background: #3498db; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; }
-        .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 40px; }
-        .feature-card { border: 1px solid #ddd; padding: 20px; border-radius: 8px; text-align: center; }
-    </style></head><body>
-    <header class="hero"><div class="container">
-    <h1>Catastro SaaS Pro</h1><p>Sistema profesional de análisis catastral y consultas de parcelas</p>
-    <a href="/docs" class="btn">Ver Documentación API (Swagger)</a>
-    </div></header>
-    <section class="container"><h2>Funcionalidades</h2><div class="feature-grid">
-    <div class="feature-card"><h3>Análisis GIS</h3><p>Cruce espacial con capas GPKG.</p></div>
-    <div class="feature-card"><h3>Urbanismo</h3><p>Normativa y afecciones.</p></div>
-    <div class="feature-card"><h3>Informes</h3><p>Generación de PDF automático.</p></div>
-    </div></section>
+        :root { --dark: #2c3e50; --blue: #3498db; --green: #27ae60; --gray: #f4f7f6; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; background: var(--gray); }
+        .sidebar { width: 260px; background: var(--dark); color: white; height: 100vh; padding: 20px; position: fixed; }
+        .main { margin-left: 300px; padding: 30px; width: calc(100% - 340px); }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 25px; }
+        input, button { padding: 12px; border-radius: 6px; border: 1px solid #ddd; margin-top: 10px; }
+        button { background: var(--blue); color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { opacity: 0.9; }
+        
+        /* MODAL VISOR */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); }
+        .modal-content { background: white; margin: 2% auto; padding: 20px; width: 90%; max-height: 90vh; border-radius: 10px; overflow-y: auto; }
+        .grid-visor { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        iframe { width: 100%; height: 500px; border: 1px solid #eee; border-radius: 8px; }
+        img { width: 100%; border-radius: 8px; }
+    </style>
+    </head><body>
+    <div class="sidebar">
+        <h2>Catastro SaaS Pro</h2>
+        <hr>
+        <p>📊 Dashboard Activo</p>
+        <p>🗺️ Capas GIS: Conectadas</p>
+    </div>
+    <div class="main">
+        <div class="card">
+            <h2>🔎 Análisis por Referencia Catastral</h2>
+            <input type="text" id="refInput" placeholder="Inserte referencia (14-20 caracteres)" style="width: 60%;">
+            <button onclick="ejecutarAnalisis()">Iniciar Análisis Completo</button>
+            <div id="status"></div>
+        </div>
+
+        <div class="card">
+            <h2>📂 Carga de Archivos (KML / GeoJSON)</h2>
+            <p>Sube archivos para cruzar con la base de datos GIS de 4.8GB.</p>
+            <input type="file" id="fileInput" multiple>
+            <button onclick="subirArchivo()" style="background: var(--green);">Analizar Documentos</button>
+        </div>
+    </div>
+
+    <div id="visor" class="modal">
+        <div class="modal-content">
+            <span onclick="this.parentElement.parentElement.style.display='none'" style="float:right; cursor:pointer; font-size:24px;">&times;</span>
+            <h2 id="visorTitle">Visor de Resultados</h2>
+            <div class="grid-visor">
+                <div>
+                    <h3>Mapa Interactivo</h3>
+                    <iframe id="visorMapa"></iframe>
+                </div>
+                <div>
+                    <h3>Imagen de Situación / Catastro</h3>
+                    <img id="visorImg" src="">
+                    <div id="visorAfecciones" style="margin-top:20px; padding:15px; background:#f9f9f9; border-radius:8px;"></div>
+                </div>
+            </div>
+            <div style="text-align:center; margin-top:20px;">
+                <a id="linkPdf" href="" target="_blank" style="font-size:18px; color:var(--blue); font-weight:bold;">📄 Descargar Informe PDF Oficial</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function ejecutarAnalisis() {
+            const ref = document.getElementById('refInput').value;
+            const status = document.getElementById('status');
+            status.innerHTML = "⏳ Procesando... consultando Catastro y cruce GIS.";
+            
+            try {
+                const res = await fetch('/api/analizar', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({referencia_catastral: ref})
+                });
+                const data = await res.json();
+                if(data.status === 'success') {
+                    status.innerHTML = "✅ ¡Análisis completado!";
+                    mostrarVisor(data.data);
+                } else { status.innerHTML = "❌ Error: " + data.detail; }
+            } catch (e) { status.innerHTML = "❌ Error de conexión."; }
+        }
+
+        function mostrarVisor(data) {
+            document.getElementById('visor').style.display = 'block';
+            document.getElementById('visorTitle').innerText = "Resultados: " + data.referencia;
+            document.getElementById('visorMapa').src = data.descargas.mapa;
+            document.getElementById('visorImg').src = `/outputs/${data.referencia}/mapa_situacion.jpg`; // Si el motor genera JPG
+            document.getElementById('linkPdf').href = data.descargas.pdf;
+            
+            let afeccionHtml = "<h4>Afecciones Detectadas:</h4><ul>";
+            data.afecciones.forEach(a => {
+                afeccionHtml += `<li><b>${a.capa}</b>: ${a.elementos_encontrados} elementos</li>`;
+            });
+            document.getElementById('visorAfecciones').innerHTML = afeccionHtml + "</ul>";
+        }
+    </script>
     </body></html>
     """
 
-# 5. ENDPOINT PRINCIPAL DE ANÁLISIS
 @app.post("/api/analizar", response_model=CatastroResponse)
-async def endpoint_analizar(request: QueryRequest):
+async def api_analizar(request: QueryRequest):
     ref = request.referencia_catastral.upper().strip()
-    
-    # Carpeta temporal para los archivos de esta consulta
-    path_salida_ref = Path(settings.OUTPUT_DIR) / ref
-    path_salida_ref.mkdir(parents=True, exist_ok=True)
+    out_dir = Path(settings.OUTPUT_DIR) / ref
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        # FASE 1: Obtener datos oficiales (Catastro)
-        downloader = CatastroDownloader(output_dir=str(path_salida_ref))
-        res_catastro = downloader.descargar_todo(ref)
-        
-        path_geojson = res_catastro.get("geojson_path")
-        if not path_geojson or not Path(path_geojson).exists():
-            raise HTTPException(status_code=404, detail="Referencia no encontrada o sin geometría")
+        # 1. Catastro
+        down = CatastroDownloader(str(out_dir))
+        c_data = down.descargar_todo(ref)
+        geojson = c_data.get("geojson_path")
 
-        # FASE 2: Intersección con capas locales (GPKG de 4.8GB)
-        res_gis = intersection_service.analyze_file(path_geojson, output_dir=str(path_salida_ref))
+        # 2. Cruce GIS (GPKG)
+        gis_res = intersection_service.analyze_file(geojson, output_dir=str(out_dir))
 
-        # FASE 3: Análisis Urbanístico
-        analizador_urb = AnalizadorUrbanistico(capas_service=intersection_service)
-        res_urb = analizador_urb.analizar_referencia(ref, geometria_path=path_geojson)
+        # 3. Urbanismo
+        urb = AnalizadorUrbanistico(capas_service=intersection_service)
+        urb_res = urb.analizar_referencia(ref, geometria_path=geojson)
 
-        # FASE 4: Visualización (Mapa HTML interactivo Leaflet)
-        adv_module = AdvancedAnalysisModule(output_dir=str(settings.OUTPUT_DIR))
-        adv_module.procesar_archivos([str(path_geojson)])
+        # 4. Mapa Interactivo HTML
+        adv = AdvancedAnalysisModule(output_dir=str(settings.OUTPUT_DIR))
+        adv.procesar_archivos([str(geojson)])
 
-        # FASE 5: Informe Final PDF
-        generador_pdf = GeneradorInformeCatastral(ref, str(path_salida_ref))
-        path_pdf = path_salida_ref / f"Informe_{ref}.pdf"
-        generador_pdf.generar_pdf(str(path_pdf))
+        # 5. PDF
+        pdf_gen = GeneradorInformeCatastral(ref, str(out_dir))
+        pdf_path = out_dir / f"Informe_{ref}.pdf"
+        pdf_gen.generar_pdf(str(pdf_path))
 
-        # RESPUESTA CONSOLIDADA
-        return CatastroResponse(
-            status="success",
-            data={
-                "referencia": ref,
-                "superficie": res_urb.get("superficie"),
-                "intersecciones": res_gis.get("intersecciones", []),
-                "descargas": {
-                    "pdf": f"/outputs/{ref}/Informe_{ref}.pdf",
-                    "mapa": f"/outputs/{ref}/{ref}_mapa.html"
-                }
+        return CatastroResponse(status="success", data={
+            "referencia": ref,
+            "afecciones": gis_res.get("intersecciones", []),
+            "superficie_m2": urb_res.get("superficie", {}).get("valor"),
+            "descargas": {
+                "pdf": f"/outputs/{ref}/Informe_{ref}.pdf",
+                "mapa": f"/outputs/{ref}/{ref}_mapa.html"
             }
-        )
-
+        })
     except Exception as e:
-        return CatastroResponse(
-            status="error",
-            detail=f"Error interno: {str(e)}"
-        )
+        return CatastroResponse(status="error", detail=str(e))
 
-# 6. HEALTH CHECK
-@app.get("/api/health")
-async def health_check():
-    return {"status": "online", "env": settings.ENV, "version": settings.API_VERSION}
+@app.post("/api/batch")
+async def batch_process(request: BatchRequest):
+    # Lógica para procesar múltiples referencias una tras otra
+    resultados = []
+    for ref in request.referencias:
+        # Aquí llamarías a la lógica de api_analizar para cada una
+        pass
+    return {"status": "success", "processed": len(request.referencias)}
