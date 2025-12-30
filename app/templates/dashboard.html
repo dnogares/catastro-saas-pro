@@ -7,43 +7,48 @@
     <link rel="stylesheet" href="/static/css/styles.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
-<body>
-    <nav class="navbar">
-        <div class="container">
-            <a href="/" class="logo">Catastro SaaS Pro</a>
-            <div id="system-status">Verificando...</div>
+<body class="dashboard-body">
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h3>Catastro Pro</h3>
         </div>
+        <ul class="nav-links">
+            <li><a href="/" class="active">Inicio</a></li>
+            <li><a href="#" id="btn-nueva-consulta">Nueva Consulta</a></li>
+            <li><a href="#" id="btn-historial">Historial</a></li>
+            <li><a href="#" id="btn-capas">Capas GIS</a></li>
+        </ul>
     </nav>
 
-    <main class="dashboard-container">
-        <div class="sidebar">
-            <div class="tabs">
-                <button class="tab-btn active" data-tab="consulta">🔍 Consulta</button>
-                <button class="tab-btn" data-tab="urban">🏗️ Urbanismo</button>
-                <button class="tab-btn" data-tab="archivos">📂 Archivos</button>
+    <main class="main-content">
+        <header class="top-bar">
+            <h2>Panel de Análisis</h2>
+            <div class="user-info">
+                <span id="status-badge" class="badge online">Sistema Online</span>
             </div>
-            
-            <div class="tab-content active" id="consulta">
-                <h3>Consulta Catastral</h3>
-                <form id="consulta-form">
-                    <input type="text" id="referencia" placeholder="Referencia (20 caracteres)" required>
-                    <button type="submit" class="btn-primary">Consultar</button>
-                </form>
-                <div id="consulta-result" class="result-box"></div>
+        </header>
+
+        <div class="dashboard-grid">
+            <div class="card search-card">
+                <h3>Consultar Referencia</h3>
+                <div class="search-box">
+                    <input type="text" id="refcat-input" placeholder="Ej: 1234567DG8613S0001AY" maxlength="20">
+                    <button id="btn-analizar" class="btn btn-primary">Analizar Parcela</button>
+                </div>
             </div>
 
-            <div class="tab-content" id="urban">
-                <h3>Análisis Urbanístico</h3>
-                <form id="urban-form">
-                    <input type="text" id="urban-ref" placeholder="Referencia Catastral">
-                    <button type="submit" class="btn-primary">Analizar Afecciones</button>
-                </form>
-                <div id="urban-result" class="result-box"></div>
+            <div class="card map-card">
+                <div id="map" style="height: 400px; width: 100%;"></div>
             </div>
-        </div>
 
-        <div class="map-section">
-            <div id="map"></div>
+            <div class="card results-card" id="results-container" style="display: none;">
+                <h3>Resultados del Análisis</h3>
+                <div id="analysis-data">
+                    </div>
+                <div class="actions">
+                    <button id="btn-download-pdf" class="btn btn-secondary">Descargar Informe PDF</button>
+                </div>
+            </div>
         </div>
     </main>
 
