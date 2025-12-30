@@ -1,80 +1,72 @@
 document.addEventListener('DOMContentLoaded', () => {
     // Inicializar Mapa
-    const map = L.map('map', { zoomControl: false }).setView([40.41, -3.70], 6);
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
-
-    // Capas Base
-    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-    const satelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
-    
-    // WMS Catastro (Para visualización)
-    const catastroWMS = L.tileLayer.wms('https://ovc.catastro.es/ovc/wms/CP.ashx', {
-        layers: 'CP.CadastralParcel',
-        format: 'image/png',
-        transparent: true,
-        attribution: 'Dirección General del Catastro'
+    const map = L.map('map').setView([40.416775, -3.703790], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    L.control.layers({ "Mapa": osm, "Satélite": satelite }, { "Catastro": catastroWMS }).addTo(map);
+    let currentLayer = null;
 
-    let layerParcela = null;
+    // Elementos UI
+    const btnAnalizar = document.getElementById('btn-analizar');
+    const refInput = document.getElementById('refcat-input');
+    const resultsContainer = document.getElementById('results-container');
+    const analysisData = document.getElementById('analysis-data');
 
-    // Formulario de Búsqueda
-    const form = document.getElementById('consulta-form');
-    const panelResultados = document.getElementById('consulta-result');
+    // Función de Análisis
+    async function analizarParcela() {
+        const referencia = refInput.value.trim();
+        if (!referencia) {
+            alert('Por favor, introduce una referencia catastral.');
+            return;
+        }
 
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const ref = document.getElementById('referencia').value;
-        
-        panelResultados.innerHTML = '<div class="loader"></div><p>Analizando capas locales...</p>';
+        btnAnalizar.disabled = true;
+        btnAnalizar.innerText = 'Analizando...';
 
         try {
-            const response = await fetch('/api/analizar', {
+            const response = await fetch('/api/catastro/consultar', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ referencia_catastral: ref })
+                body: JSON.stringify({ referencia_catastral: referencia })
             });
-            const res = await response.json();
 
-            if (response.ok) {
-                // Dibujar parcela en el mapa
-                if (layerParcela) map.removeLayer(layerParcela);
-                layerParcela = L.geoJSON(res.data.geometria, {
-                    style: { color: '#ff4444', weight: 3, fillOpacity: 0.4 }
-                }).addTo(map);
-                map.fitBounds(layerParcela.getBounds());
+            const result = await response.json();
 
-                // Mostrar información y botón de descarga
-                let html = `
-                    <div class="result-card">
-                        <h3>Referencia: ${ref}</h3>
-                        <a href="${res.data.pdf_url}" class="btn-download">📥 Descargar Informe PDF</a>
-                        <div class="listado-afecciones">
-                            <h4>Afecciones del Territorio:</h4>
-                `;
-
-                if (res.data.afecciones.length > 0) {
-                    res.data.afecciones.forEach(af => {
-                        // El color viene de tus CSV de leyendas
-                        const colorBorde = af.leyenda_aplicable?.[0]?.color || '#3b82f6';
-                        html += `
-                            <div class="item-afeccion" style="border-left: 5px solid ${colorBorde}">
-                                <strong>${af.capa}</strong><br>
-                                <span>${af.leyenda_aplicable?.[0]?.etiqueta || 'Área Protegida'}</span>
-                            </div>`;
-                    });
-                } else {
-                    html += '<p class="success-msg">✅ Parcela sin afecciones detectadas.</p>';
+            if (result.status === 'success' && result.data) {
+                mostrarResultados(result.data);
+                if (result.data.geojson) {
+                    actualizarMapa(result.data.geojson);
                 }
-
-                html += '</div></div>';
-                panelResultados.innerHTML = html;
             } else {
-                panelResultados.innerHTML = `<p class="error">Error: ${res.detail}</p>`;
+                alert('Error: ' + (result.detail || 'No se pudo analizar la parcela'));
             }
-        } catch (err) {
-            panelResultados.innerHTML = '<p class="error">Error al conectar con el servidor.</p>';
+        } catch (error) {
+            console.error('Error en la petición:', error);
+            alert('Error de conexión con el servidor.');
+        } finally {
+            btnAnalizar.disabled = false;
+            btnAnalizar.innerText = 'Analizar Parcela';
         }
-    });
+    }
+
+    function mostrarResultados(data) {
+        resultsContainer.style.display = 'block';
+        analysisData.innerHTML = `
+            <div class="result-item"><strong>Referencia:</strong> \${data.referencia}</div>
+            <div class="result-item"><strong>Localización:</strong> \${data.direccion || 'No disponible'}</div>
+            <div class="result-item"><strong>Uso:</strong> \${data.uso || 'No especificado'}</div>
+            <div class="result-item"><strong>Superficie:</strong> \${data.superficie || '0'} m²</div>
+        `;
+    }
+
+    function actualizarMapa(geojson) {
+        if (currentLayer) map.removeLayer(currentLayer);
+        currentLayer = L.geoJSON(geojson, {
+            style: { color: '#2563eb', weight: 3, fillOpacity: 0.2 }
+        }).addTo(map);
+        map.fitBounds(currentLayer.getBounds());
+    }
+
+    btnAnalizar.addEventListener('click', analizarParcela);
 });
