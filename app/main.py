@@ -12,11 +12,10 @@ from fastapi.responses import HTMLResponse
 try:
     from app.catastro_engine import CatastroDownloader, procesar_y_comprimir
 except ImportError:
-    # Fallback para pruebas si el motor no está en la ruta
     def procesar_y_comprimir(ref, directorio_base):
         return f"{directorio_base}/{ref}.zip", {"lat": 40.41, "lon": -3.70}
 
-app = FastAPI(title="Catastro GIS Pro - Fixed")
+app = FastAPI(title="Catastro GIS Pro - Stable")
 
 # --- CONFIGURACIÓN DE RUTAS ---
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -32,7 +31,7 @@ app.add_middleware(
 
 app.mount("/outputs", StaticFiles(directory=str(OUTPUT_DIR)), name="outputs")
 
-# --- ENDPOINTS ---
+# --- ENDPOINTS API ---
 
 @app.post("/api/analizar")
 async def api_analizar(data: dict):
@@ -73,7 +72,7 @@ async def api_upload_vector(files: List[UploadFile] = File(...)):
             except: continue
     return {"status": "success", "analisis": lote}
 
-# --- DASHBOARD (CORREGIDO SIN F-STRING PARA EVITAR SYNTAX ERROR) ---
+# --- DASHBOARD HTML (CADENA CERRADA CORRECTAMENTE) ---
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard():
@@ -82,7 +81,7 @@ async def dashboard():
     <html lang="es">
     <head>
         <meta charset="UTF-8">
-        <title>Catastro GIS Pro | Engineering Dashboard</title>
+        <title>Catastro Pro GIS</title>
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <style>
             :root { --primary: #2563eb; --bg: #0f172a; --card: #1e293b; }
@@ -135,7 +134,6 @@ async def dashboard():
                 const ref = document.getElementById('refInput').value;
                 if(!ref) return;
                 document.getElementById('load-info').classList.remove('hidden');
-                
                 try {
                     const response = await fetch('/api/analizar', {
                         method: 'POST',
@@ -144,7 +142,6 @@ async def dashboard():
                     });
                     const res = await response.json();
                     document.getElementById('load-info').classList.add('hidden');
-                    
                     if(res.status === 'success') {
                         if(res.data.coords.lat) {
                             map.flyTo([res.data.coords.lat, res.data.coords.lon], 18);
@@ -152,12 +149,28 @@ async def dashboard():
                         }
                         agregarTarjeta(res.data);
                     }
-                } catch(e) { alert("Error de conexión"); }
+                } catch(e) { alert("Error"); }
             }
 
             function agregarTarjeta(data) {
                 const div = document.createElement('div');
                 div.className = 'res-card';
-                div.innerHTML = `
-                    <div style="font-weight:bold; margin-bottom:5px;">${data.referencia}</div>
-                    <a href="${data.pdf_url}" target="_blank">📄 PDF
+                div.innerHTML = '<strong>' + data.referencia + '</strong><br>' +
+                                '<a href="' + data.pdf_url + '" target="_blank">📄 PDF</a>' +
+                                '<a href="' + data.zip_url + '" style="color:#10b981">📦 ZIP</a>';
+                document.getElementById('results').prepend(div);
+            }
+
+            async function subirLote() {
+                const files = document.getElementById('fileInput').files;
+                const formData = new FormData();
+                for(let f of files) formData.append('files', f);
+                const response = await fetch('/api/upload-vector', { method: 'POST', body: formData });
+                const data = await response.json();
+                data.analisis.forEach(item => agregarTarjeta({referencia: item.ref, zip_url: item.zip, pdf_url: "#"}));
+            }
+        </script>
+    </body>
+    </html>
+    """
+    return html_content
