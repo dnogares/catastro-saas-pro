@@ -1,85 +1,85 @@
 import os
+import json
 import shutil
-import uuid
-import pandas as pd
-from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks
+from typing import List
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse, FileResponse
-from typing import List, Optional
+from fpdf import FPDF
 
-# Importamos tus módulos (asumiendo que los guardas con estos nombres)
+# Importar tus clases de los archivos que ya tienes
 from kml_processor import AdvancedAnalysisModule
 from vector_analyzer import procesar_parcelas, listar_capas_wms, cargar_config_titulos
-from urban_analysis import AnalizadorUrbanistico
 
-app = FastAPI(title="Catastro SaaS Pro - Ultimate Edition")
+app = FastAPI()
 
-# --- ENDPOINTS MÓDULO 1: GESTIÓN CATASTRO (Lotes y Referencias) ---
-
-@app.post("/api/catastro/batch")
-async def batch_process(file: UploadFile = File(...), group_by: str = Form("referencia")):
-    """
-    Recibe CSV/TXT con multitud de referencias. 
-    Genera GML, KML e Imágenes por cada una.
-    """
-    filename = f"batch_{uuid.uuid4()}.csv"
-    temp_path = f"datos_origen/{filename}"
-    
-    with open(temp_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    
-    # Aquí se dispararía la lógica de iteración sobre el CSV
-    # Llamando a AnalizadorUrbanistico por cada fila
-    return {"status": "success", "message": f"Procesando lote agrupado por {group_by}"}
-
-# --- ENDPOINTS MÓDULO 2: ANÁLISIS KML AVANZADO ---
-
-@app.post("/api/analysis/kml-advanced")
-async def kml_advanced(files: List[UploadFile] = File(...)):
-    """Responde al código de AdvancedAnalysisModule"""
-    processor = AdvancedAnalysisModule(output_dir="outputs/kml_analysis")
-    saved_paths = []
-    
-    for file in files:
-        path = f"datos_origen/{file.filename}"
-        with open(path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        saved_paths.append(path)
-    
-    resultados = processor.procesar_archivos(saved_paths)
-    return {"status": "success", "data": resultados}
-
-# --- ENDPOINTS MÓDULO 3: AFECCIONES VECTORIALES (El script largo) ---
-
-@app.post("/api/analysis/vectorial")
-async def run_vector_analysis(background_tasks: BackgroundTasks):
-    """
-    Ejecuta el script de cálculo de % de afección, 
-    generación de títulos dinámicos y mapas con IGN-Base.
-    """
-    # Configuraciones requeridas por tu script
-    capas_wms = listar_capas_wms("capas/wms/capas_wms.csv")
-    config_titulos = cargar_config_titulos("capas/wms/titulos.csv")
-    
-    # Ejecutamos la función de tu punto 3
-    # Nota: En producción, esto debería ser asíncrono (BackgroundTasks)
-    try:
-        procesar_parcelas(None, None, capas_wms, "EPSG:25830", config_titulos)
-        return {"status": "success", "message": "Análisis vectorial completado"}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-# --- ENDPOINT MÓDULO 5: GENERADOR DE INFORME PERSONALIZADO ---
+# Configuración de directorios
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
+CAPAS_DIR = os.path.join(BASE_DIR, "capas")
 
 @app.post("/api/report/generate")
-async def generate_final_report(
+async def generate_report(
     ref: str = Form(...),
     empresa: str = Form(...),
     tecnico: str = Form(...),
     colegiado: str = Form(...),
     notas: str = Form(""),
-    incluir_archivos: str = Form(...), # JSON con IDs de mapas seleccionados
+    incluir_archivos: str = Form(...), # JSON string con array de rutas
     logo: UploadFile = File(None)
 ):
-    """Genera el PDF final uniendo datos de los 3 módulos anteriores"""
-    # Lógica de FPDF para crear el informe con los JPGs generados en el módulo 3
-    return {"status": "success", "pdf_url": f"/outputs/{ref}/informe_final.pdf"}
+    try:
+        # 1. Preparar PDF
+        pdf = FPDF()
+        pdf.add_page()
+        
+        # 2. Manejo de Logo
+        if logo:
+            logo_path = os.path.join(OUTPUT_DIR, f"temp_logo_{ref}.png")
+            with open(logo_path, "wb") as buffer:
+                shutil.copyfileobj(logo.file, buffer)
+            pdf.image(logo_path, 10, 8, 33)
+            pdf.ln(20)
+
+        # 3. Encabezado
+        pdf.set_font("Arial", 'B', 16)
+        pdf.cell(0, 10, f"INFORME TÉCNICO DE AFECCIONES", 0, 1, 'C')
+        pdf.set_font("Arial", '', 12)
+        pdf.cell(0, 10, f"Referencia: {ref}", 0, 1, 'C')
+        pdf.ln(10)
+
+        # 4. Datos del Técnico
+        pdf.set_fill_color(240, 240, 240)
+        pdf.cell(0, 10, " DATOS DEL PROFESIONAL", 0, 1, 'L', True)
+        pdf.set_font("Arial", '', 11)
+        pdf.cell(0, 8, f"Empresa: {empresa}", 0, 1)
+        pdf.cell(0, 8, f"Técnico: {tecnico}", 0, 1)
+        pdf.cell(0, 8, f"Nº Colegiado: {colegiado}", 0, 1)
+        pdf.ln(5)
+
+        if notas:
+            pdf.set_font("Arial", 'I', 10)
+            pdf.multi_cell(0, 5, f"Notas adicionales: {notas}")
+            pdf.ln(10)
+
+        # 5. Insertar Mapas Seleccionados (Punto 3 y 4)
+        lista_mapas = json.loads(incluir_archivos)
+        for img_path in lista_mapas:
+            # Limpiar la ruta para que sea local
+            local_img = img_path.split("/outputs/")[-1]
+            full_path = os.path.join(OUTPUT_DIR, local_img)
+            
+            if os.path.exists(full_path):
+                pdf.add_page()
+                pdf.set_font("Arial", 'B', 12)
+                pdf.cell(0, 10, f"PLANO: {os.path.basename(full_path)}", 0, 1)
+                pdf.image(full_path, x=10, y=30, w=190)
+
+        # 6. Guardar y retornar
+        report_name = f"Informe_{ref}.pdf"
+        report_path = os.path.join(OUTPUT_DIR, ref, report_name)
+        os.makedirs(os.path.dirname(report_path), exist_ok=True)
+        pdf.output(report_path)
+
+        return {"status": "success", "pdf_url": f"/outputs/{ref}/{report_name}"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
