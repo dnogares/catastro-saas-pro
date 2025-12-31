@@ -1,47 +1,76 @@
-// Dentro del objeto UI en tasador.js
-async analizarCatastro() {
-    const ref = document.getElementById('ref-input').value.toUpperCase();
-    if (ref.length < 14) return alert("Referencia no válida");
-    
-    this.addLog(`🚀 Enviando consulta al servidor: ${ref}`);
+const AppState = {
+    currentRef: null,
+    afecciones: [],
+    logoB64: null
+};
 
-    try {
-        const formData = new FormData();
-        formData.append('referencia', ref);
+const MapManager = {
+    map: null,
+    parcelLayer: null,
 
-        const response = await fetch('http://localhost:8000/api/analizar-referencia', {
-            method: 'POST',
-            body: formData
+    init() {
+        this.map = L.map('main-map', { zoomControl: false }).setView([40.41, -3.70], 6);
+        
+        const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.map);
+        const pnoa = L.tileLayer.wms("https://www.ign.es/wms-inspire/pnoa-ma", {
+            layers: 'OI.OrthoimageCoverage', format: 'image/png', transparent: true
         });
 
-        const data = await response.json();
+        L.control.layers({ "Callejero": osm, "Satélite": pnoa }, {}, { position: 'bottomright' }).addTo(this.map);
+        L.control.zoom({ position: 'bottomright' }).addTo(this.map);
+    },
 
-        if (data.status === 'success') {
-            // 1. Dibujar en el mapa
-            MapViewer.drawParcel(data.geojson);
-            
-            // 2. Actualizar tarjeta de afecciones a la derecha
-            this.actualizarPanelAfecciones(data.datos.zonas_afectadas);
-            
-            this.addLog(`✅ Análisis completado para ${ref}`);
-        }
-    } catch (error) {
-        this.addLog(`❌ Error en el servidor: ${error.message}`);
+    updateParcel(geojson) {
+        if (this.parcelLayer) this.map.removeLayer(this.parcelLayer);
+        this.parcelLayer = L.geoJSON(geojson, {
+            style: { color: '#e53e3e', weight: 3, fillOpacity: 0.2 }
+        }).addTo(this.map);
+        this.map.fitBounds(this.parcelLayer.getBounds());
     }
-},
+};
 
-actualizarPanelAfecciones(afecciones) {
-    const container = document.getElementById('afecciones-container');
-    container.innerHTML = ""; // Limpiar
-    
-    afecciones.forEach(af => {
-        const div = document.createElement('div');
-        div.className = "widget-card mt-sm";
-        div.style.borderLeft = "4px solid var(--color-danger)";
-        div.innerHTML = `
-            <div class="text-sm font-bold">${af.nota || 'Afección detectada'}</div>
-            <div class="text-xs text-muted">Capa: ${af.capa || 'Normativa'}</div>
-        `;
-        container.appendChild(div);
-    });
-}
+const Actions = {
+    async buscarReferencia() {
+        const ref = document.getElementById('ref-input').value;
+        if (!ref) return;
+
+        try {
+            const res = await fetch(`http://localhost:8000/api/analizar-referencia?ref=${ref}`, { method: 'POST' });
+            const data = await res.json();
+            
+            if (data.status === 'success') {
+                AppState.currentRef = ref;
+                AppState.afecciones = data.datos.zonas_afectadas;
+                MapManager.updateParcel(data.geojson);
+                this.renderAfecciones();
+            }
+        } catch (e) { console.error("Error:", e); }
+    },
+
+    renderAfecciones() {
+        const container = document.getElementById('afecciones-container');
+        container.innerHTML = AppState.afecciones.map(af => `
+            <div class="afeccion-item" style="border-left: 4px solid #e53e3e; margin-bottom: 8px; padding: 5px; background: rgba(255,255,255,0.5)">
+                <strong>${af.capa || 'Afección'}</strong><br>
+                <span class="text-xs">${af.nota}</span>
+            </div>
+        `).join('');
+    },
+
+    async generarPDF() {
+        const body = {
+            ref: AppState.currentRef,
+            tecnico: document.getElementById('rep-author').value,
+            colegiado: document.getElementById('rep-id').value,
+            logo: AppState.logoB64
+        };
+        // Petición al endpoint de FastAPI (main.py)
+        console.log("Generando informe para", body.ref);
+    }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    MapManager.init();
+    document.getElementById('btn-buscar').onclick = () => Actions.buscarReferencia();
+    document.getElementById('btn-generate-pdf').onclick = () => Actions.generarPDF();
+});
