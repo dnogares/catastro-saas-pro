@@ -1,32 +1,25 @@
 /**
- * CATASTRO SaaS Pro - Frontend Engine v2.0
- * Arquitectura basada en módulos para gestión de tarjetas y mapa
+ * CATASTRO SaaS Pro - Frontend Controller
  */
 
 const AppState = {
     currentRef: null,
     currentData: null,
     logoB64: null,
-    isProcessing: false,
-    layers: {
-        parcela: null,
-        afecciones: L.layerGroup()
-    }
+    isMapLoaded: false
 };
 
 const MapManager = {
     map: null,
+    layers: {
+        parcela: null,
+        afecciones: L.layerGroup()
+    },
 
     init() {
-        // Inicializar Leaflet centrado en España
         this.map = L.map('main-map', { zoomControl: false }).setView([40.41, -3.70], 6);
 
-        // Capa Base: Callejero
-        const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
-        }).addTo(this.map);
-
-        // Capa Satélite: PNOA (IGN)
+        const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.map);
         const pnoa = L.tileLayer.wms("https://www.ign.es/wms-inspire/pnoa-ma", {
             layers: 'OI.OrthoimageCoverage',
             format: 'image/png',
@@ -34,101 +27,103 @@ const MapManager = {
             attribution: "IGN España"
         });
 
-        // Controles posicionados para no tapar tarjetas
-        L.control.layers({ "Mapa": osm, "Satélite PNOA": pnoa }, {}, { position: 'bottomright' }).addTo(this.map);
+        L.control.layers({ "Mapa": osm, "Satélite": pnoa }, {}, { position: 'bottomright' }).addTo(this.map);
         L.control.zoom({ position: 'bottomright' }).addTo(this.map);
-        
-        AppState.layers.afecciones.addTo(this.map);
+        this.layers.afecciones.addTo(this.map);
+        AppState.isMapLoaded = true;
     },
 
     drawParcel(geojson) {
-        if (AppState.layers.parcela) this.map.removeLayer(AppState.layers.parcela);
-        
-        AppState.layers.parcela = L.geoJSON(geojson, {
-            style: { color: '#e53e3e', weight: 4, fillOpacity: 0.1 }
+        if (this.layers.parcela) this.map.removeLayer(this.layers.parcela);
+        this.layers.parcela = L.geoJSON(geojson, {
+            style: { color: '#e53e3e', weight: 4, fillOpacity: 0.2, dashArray: '5, 10' }
         }).addTo(this.map);
-        
-        this.map.fitBounds(AppState.layers.parcela.getBounds(), { padding: [50, 50] });
+        this.map.fitBounds(this.layers.parcela.getBounds(), { padding: [50, 50] });
     }
 };
 
-const UIManager = {
+const UIActions = {
     init() {
-        // Buscar por referencia
-        document.getElementById('btn-buscar').onclick = () => this.ejecutarAnalisis();
-        document.getElementById('ref-input').onkeypress = (e) => { if(e.key === 'Enter') this.ejecutarAnalisis(); };
+        // Buscador
+        document.getElementById('btn-buscar').onclick = () => this.runAnalysis();
+        document.getElementById('ref-input').onkeypress = (e) => { if(e.key === 'Enter') this.runAnalysis(); };
 
-        // Gestión de Logo (Drag & Drop)
-        this.setupLogoUpload();
+        // Logo
+        this.setupLogoHandler();
 
-        // Botón PDF
-        document.getElementById('btn-generate-pdf').onclick = () => this.generarInforme();
+        // PDF
+        document.getElementById('btn-generate-pdf').onclick = () => this.generatePDF();
     },
 
-    async ejecutarAnalisis() {
-        const ref = document.getElementById('ref-input').value.toUpperCase();
+    async runAnalysis() {
+        const ref = document.getElementById('ref-input').value.trim().toUpperCase();
         if (ref.length < 14) return alert("Referencia Catastral no válida");
 
-        this.setLoading(true);
+        const btn = document.getElementById('btn-buscar');
+        btn.innerHTML = "⌛";
+        
         try {
-            const formData = new FormData();
-            formData.append('ref', ref);
+            const fd = new FormData();
+            fd.append('ref', ref);
 
-            const response = await fetch('http://localhost:8000/api/analizar-referencia', {
-                method: 'POST',
-                body: formData
-            });
-            const data = await response.json();
+            const response = await fetch('http://localhost:8000/api/analizar-referencia', { method: 'POST', body: fd });
+            const result = await response.json();
 
-            if (data.status === 'success') {
+            if (result.status === 'success') {
                 AppState.currentRef = ref;
-                AppState.currentData = data.datos;
-                MapManager.drawParcel(data.geojson);
-                this.renderAfecciones(data.datos.zonas_afectadas);
+                AppState.currentData = result.datos;
+                MapManager.drawParcel(result.geojson);
+                this.updateAfeccionesPanel(result.datos.zonas_afectadas);
             }
         } catch (error) {
-            console.error("Error analizando:", error);
+            console.error("Error en análisis:", error);
+            alert("Error conectando con el servidor Python");
         } finally {
-            this.setLoading(false);
+            btn.innerHTML = "🔍";
         }
     },
 
-    renderAfecciones(lista) {
+    updateAfeccionesPanel(afecciones) {
         const container = document.getElementById('afecciones-container');
-        container.innerHTML = lista.map(af => `
-            <div class="glass-card mb-sm" style="border-left: 4px solid #e53e3e; padding: 10px;">
-                <div class="text-sm font-bold">${af.capa || 'Afección Técnica'}</div>
-                <div class="text-xs text-muted">${af.nota}</div>
+        if (!afecciones || afecciones.length === 0) {
+            container.innerHTML = '<p class="text-xs text-muted">Sin afecciones detectadas en esta parcela.</p>';
+            return;
+        }
+
+        container.innerHTML = afecciones.map(af => `
+            <div class="afeccion-card mb-sm p-sm" style="border-left: 4px solid #e53e3e; background: rgba(255,255,255,0.4)">
+                <div class="text-xs font-bold">${af.capa || 'Normativa'}</div>
+                <div class="text-xs">${af.nota}</div>
             </div>
-        `).join('') || '<p class="text-xs">Sin afecciones detectadas.</p>';
+        `).join('');
     },
 
-    setupLogoUpload() {
+    setupLogoHandler() {
         const dropZone = document.getElementById('logo-drop');
         dropZone.onclick = () => {
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
-            input.onchange = (e) => this.handleImage(e.target.files[0]);
+            input.onchange = (e) => {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    AppState.logoB64 = ev.target.result;
+                    dropZone.innerHTML = `<img src="${ev.target.result}" style="max-height:100%; border-radius:4px">`;
+                };
+                reader.readAsDataURL(e.target.files[0]);
+            };
             input.click();
         };
     },
 
-    handleImage(file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            AppState.logoB64 = e.target.result;
-            document.getElementById('logo-drop').innerHTML = `<img src="${AppState.logoB64}" style="max-height: 100%; max-width: 100%;">`;
-        };
-        reader.readAsDataURL(file);
-    },
-
-    async generarInforme() {
-        if (!AppState.currentRef) return alert("Realice un análisis primero");
+    async generatePDF() {
+        if (!AppState.currentRef) return alert("Primero analice una referencia");
         
         const btn = document.getElementById('btn-generate-pdf');
-        btn.innerText = "⌛ Generando...";
-        
+        const originalText = btn.innerHTML;
+        btn.innerHTML = "⌛ GENERANDO PDF...";
+        btn.disabled = true;
+
         const payload = {
             ref: AppState.currentRef,
             tecnico: document.getElementById('rep-author').value,
@@ -144,24 +139,29 @@ const UIManager = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            
-            const blob = await res.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `INFORME_${AppState.currentRef}.pdf`;
-            a.click();
-        } catch (e) { alert("Error al generar PDF"); }
-        finally { btn.innerText = "📄 GENERAR INFORME PDF"; }
-    },
 
-    setLoading(val) {
-        AppState.isProcessing = val;
-        document.getElementById('btn-buscar').innerText = val ? "..." : "🔍";
+            if (res.ok) {
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Informe_${AppState.currentRef}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            } else {
+                throw new Error("Error en el servidor");
+            }
+        } catch (e) {
+            alert("Error al generar el PDF");
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
     }
 };
 
 document.addEventListener('DOMContentLoaded', () => {
     MapManager.init();
-    UIManager.init();
+    UIActions.init();
 });
